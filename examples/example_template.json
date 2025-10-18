@@ -1,0 +1,63 @@
+{
+  "template_name": "Quarterly Business Report",
+  "sections": [
+    {
+      "name": "Executive Summary",
+      "type": "text_analysis",
+      "data_source": ["Summary"],
+      "ai_processing": true,
+      "formatting": {
+        "font_size": 14,
+        "alignment": "left"
+      }
+    },
+    {
+      "name": "Financial Overview",
+      "type": "data_table",
+      "data_source": ["Financials"],
+      "filters": ["date_range", "category"],
+      "formatting": {
+        "header_color": "#4472C4",
+        "alternating_rows": true
+      }
+    },
+    {
+      "name": "Sales Performance",
+      "type": "visualization",
+      "chart_type": "bar_chart",
+      "data_source": ["Sales"],
+      "formatting": {
+        "chart_style": "modern",
+        "colors": ["#4472C4", "#ED7D31", "#A5A5A5"]
+      }
+    },
+    {
+      "name": "Regional Analysis",
+      "type": "visualization",
+      "chart_type": "column_chart",
+      "data_source": ["Regional"],
+      "formatting": {
+        "chart_style": "modern"
+      }
+    },
+    {
+      "name": "Market Trends",
+      "type": "text_analysis",
+      "data_source": ["Market"],
+      "ai_processing": true,
+      "formatting": {
+        "font_size": 12
+      }
+    },
+    {
+      "name": "Key Metrics",
+      "type": "data_table",
+      "data_source": ["Metrics"],
+      "formatting": {
+        "highlight_top": 3,
+        "conditional_formatting": true
+      }
+    }
+  ]
+}
+

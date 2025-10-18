@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init)",
+      "Bash(git config user.name \"TurtleWithGlasses\")",
+      "Bash(git config user.email \"user@example.com\")",
+      "Bash(git remote add origin https://github.com/TurtleWithGlasses/excel-to-ppt-report.git)",
+      "Bash(git add .)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
