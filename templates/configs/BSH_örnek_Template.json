@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "name": "BSH örnek",
+    "description": "Fashion & Retail report template",
+    "industry": "Fashion & Retail",
+    "author": "ReportForge Template Builder",
+    "version": "1.0",
+    "created_date": "2025-11-30",
+    "modified_date": "2025-11-30"
+  },
+  "settings": {
+    "page_size": "16:9",
+    "default_font": "Segoe UI",
+    "default_font_size": 11,
+    "color_scheme": {
+      "primary": "#2563EB",
+      "secondary": "#10B981",
+      "accent": "#F59E0B",
+      "negative": "#EF4444",
+      "neutral": "#6B7280",
+      "text": "#1F2937",
+      "background": "#FFFFFF"
+    }
+  },
+  "slides": [
+    {
+      "name": "başlık",
+      "type": "Title Slide",
+      "components": []
+    },
+    {
+      "name": "özet",
+      "type": "Summary/Insights Slide",
+      "components": []
+    }
+  ]
+}
