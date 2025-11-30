@@ -459,19 +459,18 @@ class MainWindow(QMainWindow):
 
         template_combo = QComboBox()
         template_combo.setFont(QFont("Segoe UI", 10))
-        template_combo.addItems([
-            "--- Fashion & Retail ---",
-            "BSH Monthly Media Report",
-            "LC Waikiki Monthly Report",
-            "--- Pharmaceutical ---",
-            "Sanofi Pharma Media Report",
-            "--- Energy Sector ---",
-            "SOCAR Energy Sector Template",
-            "--- Financial ---",
-            "Financial Quarterly Report",
-            "--- Custom ---",
-            "Create New Template..."
-        ])
+
+        # Load templates dynamically from templates/configs/
+        template_items = []
+        for name in sorted(self.template_map.keys()):
+            template_items.append(name)
+
+        # Add separator and Create New option
+        if template_items:
+            template_items.append("---")
+        template_items.append("Create New Template...")
+
+        template_combo.addItems(template_items)
         layout.addWidget(template_combo)
 
         buttons = QDialogButtonBox(
@@ -493,9 +492,9 @@ class MainWindow(QMainWindow):
                 )
                 if reply == QMessageBox.StandardButton.Yes:
                     self.open_template_builder()
-            elif self.template_name.startswith("---"):
-                # Category header, ignore
-                QMessageBox.information(self, "Category", "Please select an actual template, not a category header.")
+            elif self.template_name == "---":
+                # Separator, ignore
+                QMessageBox.information(self, "Invalid Selection", "Please select an actual template.")
                 return
             else:
                 # Map template name to path
