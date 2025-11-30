@@ -15,9 +15,13 @@ import matplotlib
 from io import BytesIO
 import os
 import tempfile
+import warnings
 
 # Use non-interactive backend for server environments
 matplotlib.use('Agg')
+
+# Suppress matplotlib tight_layout warnings
+warnings.filterwarnings('ignore', message='.*Tight layout.*')
 
 
 class ChartComponent(BaseComponent):
@@ -175,6 +179,17 @@ class ChartComponent(BaseComponent):
         if not available_cols:
             return None
 
+        # Drop rows with NaN in critical columns
+        if self.y_column and self.y_column in df.columns:
+            df = df.dropna(subset=[self.y_column])
+
+        if self.x_column and self.x_column in df.columns:
+            df = df.dropna(subset=[self.x_column])
+
+        # Check if we have any data left
+        if df.empty:
+            return None
+
         # Apply sorting
         if self.sort_by and self.sort_by in df.columns:
             df = df.sort_values(by=self.sort_by, ascending=False)
@@ -196,10 +211,20 @@ class ChartComponent(BaseComponent):
             str: Path to temporary image file
         """
         try:
-            # Set figure size based on component dimensions
-            fig_width = self.width.inches
-            fig_height = self.height.inches
-            fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=150)
+            # Set figure size based on component dimensions (limit to reasonable values)
+            fig_width = min(self.width.inches, 20)  # Max 20 inches
+            fig_height = min(self.height.inches, 15)  # Max 15 inches
+
+            # Use lower DPI to prevent huge images
+            dpi = 100  # Reduced from 150
+
+            # Check if resulting image would be too large
+            max_pixels = 10000  # Max dimension in pixels
+            if fig_width * dpi > max_pixels or fig_height * dpi > max_pixels:
+                # Scale down DPI to fit
+                dpi = int(min(max_pixels / fig_width, max_pixels / fig_height))
+
+            fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=dpi)
 
             # Get colors
             colors = self._get_colors(df)
@@ -226,8 +251,14 @@ class ChartComponent(BaseComponent):
             temp_path = temp_file.name
             temp_file.close()
 
-            plt.tight_layout()
-            plt.savefig(temp_path, dpi=150, bbox_inches='tight', facecolor='white')
+            # Apply tight layout (suppress warnings if it fails)
+            try:
+                plt.tight_layout()
+            except Exception:
+                pass  # Ignore layout warnings
+
+            # Save with same DPI as figure
+            plt.savefig(temp_path, dpi=dpi, bbox_inches='tight', facecolor='white')
             plt.close(fig)
 
             return temp_path
@@ -370,7 +401,7 @@ class ChartComponent(BaseComponent):
         Returns:
             List of hex color codes
         """
-        if isinstance(self.colors, list):
+        if isinstance(self.colors, list) and self.colors:
             return self.colors
 
         if self.colors == 'brand':
@@ -378,8 +409,16 @@ class ChartComponent(BaseComponent):
             return ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
 
         # Default matplotlib colors
-        prop_cycle = plt.rcParams['axes.prop_cycle']
-        return [c['color'] for c in prop_cycle][:10]
+        try:
+            prop_cycle = plt.rcParams['axes.prop_cycle']
+            colors = [c['color'] for c in prop_cycle][:10]
+            if colors:
+                return colors
+        except Exception:
+            pass
+
+        # Fallback colors if everything else fails
+        return ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
 
     def _apply_chart_styling(self, ax, fig) -> None:
         """
