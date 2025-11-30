@@ -218,19 +218,41 @@ class ChartComponent(BaseComponent):
                 raw_width = 9.0
                 raw_height = 5.0
 
-            # Clamp to reasonable bounds
-            fig_width = max(1.0, min(raw_width, 20.0))  # Between 1 and 20 inches
-            fig_height = max(1.0, min(raw_height, 15.0))  # Between 1 and 15 inches
+            # DEBUG: Print values to help diagnose
+            print(f"[DEBUG] Raw dimensions: {raw_width}x{raw_height} inches")
+
+            # Clamp to reasonable bounds - FORCE to safe values
+            if raw_width > 20.0 or raw_width < 1.0:
+                print(f"[DEBUG] Clamping width from {raw_width} to 20.0")
+                fig_width = 20.0 if raw_width > 20.0 else 9.0
+            else:
+                fig_width = raw_width
+
+            if raw_height > 15.0 or raw_height < 1.0:
+                print(f"[DEBUG] Clamping height from {raw_height} to 15.0")
+                fig_height = 15.0 if raw_height > 15.0 else 5.0
+            else:
+                fig_height = raw_height
 
             # Use lower DPI to prevent huge images
             dpi = 100  # Reduced from 150
+
+            print(f"[DEBUG] Final dimensions: {fig_width}x{fig_height} inches at {dpi} DPI = {fig_width*dpi}x{fig_height*dpi} pixels")
 
             # Check if resulting image would be too large (max 2^16 = 65536)
             max_pixels = 10000  # Conservative limit
             if fig_width * dpi > max_pixels or fig_height * dpi > max_pixels:
                 # Scale down DPI to fit within limits
+                old_dpi = dpi
                 dpi = int(min(max_pixels / fig_width, max_pixels / fig_height, dpi))
                 dpi = max(50, dpi)  # Minimum 50 DPI for readability
+                print(f"[DEBUG] Scaled DPI from {old_dpi} to {dpi}")
+
+            # Set matplotlib's default figsize and dpi to prevent pandas .plot() from creating huge figures
+            # This is critical because pandas DataFrame.plot() creates figures internally using rcParams
+            plt.rcParams['figure.figsize'] = [fig_width, fig_height]
+            plt.rcParams['figure.dpi'] = dpi
+            plt.rcParams['figure.max_open_warning'] = 0  # Suppress warnings about too many figures
 
             fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=dpi)
 
@@ -261,20 +283,71 @@ class ChartComponent(BaseComponent):
 
             # Apply tight layout (suppress warnings if it fails)
             try:
-                plt.tight_layout()
+                plt.tight_layout(pad=1.0)  # Use padding instead of tight bbox
             except Exception:
                 pass  # Ignore layout warnings
 
-            # Save with same DPI as figure
-            plt.savefig(temp_path, dpi=dpi, bbox_inches='tight', facecolor='white')
+            # Calculate expected pixel dimensions
+            expected_width_px = int(fig_width * dpi)
+            expected_height_px = int(fig_height * dpi)
+            
+            # Maximum allowed dimensions (2^16 = 65536, use 10000 for safety)
+            MAX_DIMENSION_PX = 10000
+            
+            # Validate dimensions before saving
+            if expected_width_px > MAX_DIMENSION_PX or expected_height_px > MAX_DIMENSION_PX:
+                # Scale down if still too large
+                scale_factor = min(MAX_DIMENSION_PX / expected_width_px, MAX_DIMENSION_PX / expected_height_px, 1.0)
+                new_dpi = max(50, int(dpi * scale_factor))
+                print(f"[DEBUG] Scaling DPI from {dpi} to {new_dpi} to fit within {MAX_DIMENSION_PX}px limit")
+                dpi = new_dpi
+                expected_width_px = int(fig_width * dpi)
+                expected_height_px = int(fig_height * dpi)
+
+            # Save with validated DPI, use pad_inches instead of bbox_inches='tight'
+            # bbox_inches='tight' can cause images to exceed expected dimensions
+            plt.savefig(
+                temp_path, 
+                dpi=dpi, 
+                bbox_inches=None,  # Don't use 'tight' - it causes dimension issues
+                pad_inches=0.1,  # Small padding instead
+                facecolor='white',
+                edgecolor='none'
+            )
+            
+            # Verify saved image dimensions (check actual file size if possible)
+            try:
+                from PIL import Image
+                with Image.open(temp_path) as img:
+                    actual_width, actual_height = img.size
+                    if actual_width > MAX_DIMENSION_PX or actual_height > MAX_DIMENSION_PX:
+                        print(f"[WARNING] Saved image is {actual_width}x{actual_height}px, exceeds {MAX_DIMENSION_PX}px limit")
+                        # Resize if needed
+                        if actual_width > MAX_DIMENSION_PX:
+                            scale = MAX_DIMENSION_PX / actual_width
+                            new_width = MAX_DIMENSION_PX
+                            new_height = int(actual_height * scale)
+                            img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                            img_resized.save(temp_path)
+                            print(f"[DEBUG] Resized image to {new_width}x{new_height}px")
+            except ImportError:
+                pass  # PIL not available, skip verification
+            except Exception as e:
+                print(f"[DEBUG] Could not verify image size: {e}")
+            
             plt.close(fig)
 
             return temp_path
 
         except Exception as e:
             print(f"Error generating chart: {e}")
+            import traceback
+            traceback.print_exc()  # Print full traceback for debugging
             if 'fig' in locals():
-                plt.close(fig)
+                try:
+                    plt.close(fig)
+                except Exception:
+                    pass
             return None
 
     def _create_column_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
@@ -407,25 +480,45 @@ class ChartComponent(BaseComponent):
             df: DataFrame with chart data
 
         Returns:
-            List of hex color codes
+            List of hex color codes (always returns at least one color)
         """
-        if isinstance(self.colors, list) and self.colors:
+        # Try user-defined colors first
+        if isinstance(self.colors, list) and len(self.colors) > 0:
             return self.colors
 
         if self.colors == 'brand':
             # Use template brand colors (TODO: get from template)
             return ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
 
-        # Default matplotlib colors
+        # Default matplotlib colors - with robust error handling
         try:
             prop_cycle = plt.rcParams['axes.prop_cycle']
-            colors = [c['color'] for c in prop_cycle][:10]
+            # Handle different prop_cycle formats safely
+            colors = []
+            for c in prop_cycle:
+                try:
+                    if isinstance(c, dict):
+                        color = c.get('color') or c.get('c')
+                    elif hasattr(c, 'color'):
+                        color = c.color
+                    elif hasattr(c, 'c'):
+                        color = c.c
+                    else:
+                        continue
+                    if color:
+                        colors.append(color)
+                except (KeyError, AttributeError, IndexError, TypeError):
+                    continue
+                if len(colors) >= 10:
+                    break
+            
             if colors:
                 return colors
-        except Exception:
+        except (KeyError, AttributeError, IndexError, TypeError) as e:
+            # Fall through to default colors
             pass
 
-        # Fallback colors if everything else fails
+        # Fallback colors - always return at least one color
         return ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
 
     def _apply_chart_styling(self, ax, fig) -> None:

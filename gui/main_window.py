@@ -158,12 +158,8 @@ class MainWindow(QMainWindow):
         self.generated_slides = []
         self.current_slide_index = 0
 
-        # Map template names to file paths
-        self.template_map = {
-            "BSH Monthly Media Report": "templates/configs/BSH_Template.json",
-            "Sanofi Pharma Media Report": "templates/configs/Sanofi_Template.json",
-            "SOCAR Energy Sector Template": "templates/configs/SOCAR_Template.json"
-        }
+        # Load templates dynamically from templates/configs/
+        self.template_map = self.load_templates()
 
         self.init_ui()
 
@@ -716,7 +712,72 @@ class MainWindow(QMainWindow):
         # Optional: Connect signal to refresh templates when builder closes
         self.template_builder_window.destroyed.connect(self.refresh_templates)
 
+    def load_templates(self):
+        """
+        Load all templates from templates/configs/ directory.
+        Returns a dictionary mapping display names to file paths.
+        """
+        import os
+        import json
+
+        template_map = {}
+        templates_dir = os.path.join(os.getcwd(), "templates", "configs")
+
+        # Create directory if it doesn't exist
+        os.makedirs(templates_dir, exist_ok=True)
+
+        # Scan for JSON files
+        try:
+            for filename in os.listdir(templates_dir):
+                if filename.endswith('.json'):
+                    file_path = os.path.join(templates_dir, filename)
+
+                    # Read template to get display name
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            template_data = json.load(f)
+
+                        # Get name from metadata (PPTGenerator format) or top-level (Template Builder format)
+                        if 'metadata' in template_data:
+                            display_name = template_data['metadata'].get('name', filename[:-5])
+                        else:
+                            display_name = template_data.get('name', filename[:-5])
+
+                        # Use relative path
+                        relative_path = os.path.join("templates", "configs", filename)
+                        template_map[display_name] = relative_path
+
+                    except Exception as e:
+                        print(f"Error loading template {filename}: {e}")
+                        # Use filename as fallback
+                        template_map[filename[:-5]] = os.path.join("templates", "configs", filename)
+
+        except Exception as e:
+            print(f"Error scanning templates directory: {e}")
+
+        # If no templates found, return empty dict (user will need to create templates)
+        return template_map
+
     def refresh_templates(self):
         """Refresh template list after Template Builder closes"""
-        # TODO: Reload template list from templates/configs/ directory
-        pass
+        # Reload templates from directory
+        self.template_map = self.load_templates()
+
+        # Update the dropdown in Step 1
+        if hasattr(self, 'template_combo'):
+            current_selection = self.template_combo.currentText()
+
+            # Clear and repopulate
+            self.template_combo.clear()
+
+            # Group templates by industry if possible
+            template_items = []
+            for name in sorted(self.template_map.keys()):
+                template_items.append(name)
+
+            self.template_combo.addItems(template_items)
+
+            # Try to restore previous selection
+            index = self.template_combo.findText(current_selection)
+            if index >= 0:
+                self.template_combo.setCurrentIndex(index)

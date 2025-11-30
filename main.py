@@ -8,6 +8,9 @@ Usage:
 """
 
 import sys
+# Disable bytecode caching to always use latest code
+sys.dont_write_bytecode = True
+
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 from gui.main_window import MainWindow

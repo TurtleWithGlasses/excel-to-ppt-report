@@ -374,6 +374,23 @@ class TemplateBuilder(QMainWindow):
         load_btn.clicked.connect(self.load_template)
         layout.addWidget(load_btn)
 
+        delete_btn = QPushButton("Delete Template")
+        delete_btn.setFont(QFont("Segoe UI", 10))
+        delete_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #DC2626;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 10px;
+            }
+            QPushButton:hover {
+                background-color: #B91C1C;
+            }
+        """)
+        delete_btn.clicked.connect(self.delete_template)
+        layout.addWidget(delete_btn)
+
         export_btn = QPushButton("Export as JSON")
         export_btn.setFont(QFont("Segoe UI", 10))
         export_btn.clicked.connect(self.export_template)
@@ -672,11 +689,21 @@ class TemplateBuilder(QMainWindow):
 
             # TODO: Render actual slide with components
             self.preview_scene.clear()
-            text = self.preview_scene.addText(
-                f"{slide['name']}\nType: {slide['type']}\n\n"
-                f"Components: {len(slide['components'])}",
-                QFont("Segoe UI", 14)
-            )
+
+            # Build preview text (handle both Template Builder and PPTGenerator formats)
+            slide_name = slide.get('name', 'Untitled Slide')
+            slide_type = slide.get('type', 'N/A')  # Type only exists in Template Builder format
+            slide_layout = slide.get('layout', 'N/A')  # Layout exists in PPTGenerator format
+            num_components = len(slide.get('components', []))
+
+            preview_text = f"{slide_name}\n"
+            if slide_type != 'N/A':
+                preview_text += f"Type: {slide_type}\n"
+            if slide_layout != 'N/A':
+                preview_text += f"Layout: {slide_layout}\n"
+            preview_text += f"\nComponents: {num_components}"
+
+            text = self.preview_scene.addText(preview_text, QFont("Segoe UI", 14))
             text_rect = text.boundingRect()
             text.setPos(360 - text_rect.width()/2, 270 - text_rect.height()/2)
 
@@ -691,77 +718,300 @@ class TemplateBuilder(QMainWindow):
             self.slide_list.setCurrentRow(self.current_slide_index + 1)
 
     # Template Actions
-    def save_template(self):
-        """Save template to JSON file"""
-        # Update template data from UI
-        self.template_data['name'] = self.template_name_input.text()
-        self.template_data['industry'] = self.industry_combo.currentText()
-        self.template_data['font_family'] = self.font_combo.currentText()
+    def validate_template(self):
+        """
+        Validate template before saving.
+        Returns (is_valid, error_message)
+        """
+        # Check template name
+        template_name = self.template_name_input.text().strip()
+        if not template_name:
+            return False, "Template name is required."
 
-        if not self.template_data['name']:
-            QMessageBox.warning(self, "No Template Name", "Please enter a template name!")
+        # Check slides
+        if not self.template_data['slides']:
+            return False, "At least one slide is required."
+
+        # Validate each slide
+        for i, slide in enumerate(self.template_data['slides']):
+            slide_num = i + 1
+
+            # Check slide name
+            if not slide.get('name'):
+                return False, f"Slide {slide_num} is missing a name."
+
+            # Check components
+            if not slide.get('components'):
+                # Warning but not error - blank slides are allowed
+                continue
+
+            # Validate each component
+            for j, component in enumerate(slide['components']):
+                comp_num = j + 1
+
+                # Check component type
+                if 'type' not in component:
+                    return False, f"Slide {slide_num}, Component {comp_num}: Missing type."
+
+                # Check position
+                if 'position' not in component:
+                    return False, f"Slide {slide_num}, Component {comp_num}: Missing position."
+
+                # Check size
+                if 'size' not in component:
+                    return False, f"Slide {slide_num}, Component {comp_num}: Missing size."
+
+                # Type-specific validation
+                comp_type = component['type']
+
+                if comp_type == 'text':
+                    if 'content' not in component:
+                        return False, f"Slide {slide_num}, Text Component {comp_num}: Missing content."
+
+                elif comp_type == 'table':
+                    if 'data_source' not in component or 'sheet_name' not in component.get('data_source', {}):
+                        return False, f"Slide {slide_num}, Table Component {comp_num}: Missing data source configuration."
+
+                elif comp_type == 'chart':
+                    if 'data_source' not in component:
+                        return False, f"Slide {slide_num}, Chart Component {comp_num}: Missing data source."
+                    if 'chart_type' not in component:
+                        return False, f"Slide {slide_num}, Chart Component {comp_num}: Missing chart type."
+
+        return True, "Template is valid."
+
+    def save_template(self):
+        """Save template to JSON file in PPTGenerator format"""
+        # Update template data from UI
+        template_name = self.template_name_input.text()
+        industry = self.industry_combo.currentText()
+        font_family = self.font_combo.currentText()
+
+        # Validate template before saving
+        is_valid, message = self.validate_template()
+        if not is_valid:
+            QMessageBox.warning(
+                self,
+                "Validation Error",
+                f"Template validation failed:\n\n{message}\n\nPlease fix the issue and try again."
+            )
             return
+
+        # Default save location: templates/configs/
+        import os
+        default_dir = os.path.join(os.getcwd(), "templates", "configs")
+        os.makedirs(default_dir, exist_ok=True)
+        default_filename = os.path.join(default_dir, f"{template_name.replace(' ', '_')}_Template.json")
 
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Template",
-            f"{self.template_data['name']}.json",
+            default_filename,
             "JSON Files (*.json)"
         )
 
         if file_path:
+            # Convert to PPTGenerator format
+            ppt_template = {
+                "metadata": {
+                    "name": template_name,
+                    "description": f"{industry} report template",
+                    "industry": industry,
+                    "author": "ReportForge Template Builder",
+                    "version": "1.0",
+                    "created_date": datetime.now().strftime("%Y-%m-%d"),
+                    "modified_date": datetime.now().strftime("%Y-%m-%d")
+                },
+                "settings": {
+                    "page_size": "16:9",
+                    "default_font": font_family,
+                    "default_font_size": 11,
+                    "color_scheme": {
+                        "primary": self.template_data['colors']['primary'],
+                        "secondary": self.template_data['colors']['secondary'],
+                        "accent": self.template_data['colors']['accent'],
+                        "negative": "#EF4444",
+                        "neutral": "#6B7280",
+                        "text": "#1F2937",
+                        "background": "#FFFFFF"
+                    }
+                },
+                "slides": self.template_data['slides']
+            }
+
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(self.template_data, f, indent=2, ensure_ascii=False)
+                json.dump(ppt_template, f, indent=2, ensure_ascii=False)
 
             QMessageBox.information(
                 self,
                 "Template Saved",
-                f"Template saved successfully to:\n{file_path}"
+                f"Template saved successfully to:\n{file_path}\n\n"
+                f"Slides: {len(self.template_data['slides'])}\n"
+                f"Format: PPTGenerator JSON"
             )
 
     def load_template(self):
-        """Load template from JSON file"""
+        """Load template from JSON file (supports PPTGenerator format)"""
+        import os
+        default_dir = os.path.join(os.getcwd(), "templates", "configs")
+
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Load Template",
-            "",
+            default_dir if os.path.exists(default_dir) else "",
             "JSON Files (*.json);;All Files (*.*)"
         )
 
         if file_path:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                self.template_data = json.load(f)
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    loaded_data = json.load(f)
 
-            # Update UI from loaded data
-            self.template_name_input.setText(self.template_data.get('name', ''))
-            self.industry_combo.setCurrentText(self.template_data.get('industry', ''))
+                # Detect format: PPTGenerator format has "metadata" and "settings" keys
+                if 'metadata' in loaded_data and 'settings' in loaded_data:
+                    # PPTGenerator format - convert to internal format
+                    self.template_data = {
+                        'name': loaded_data['metadata'].get('name', ''),
+                        'industry': loaded_data['metadata'].get('industry', ''),
+                        'logo_path': None,
+                        'colors': {
+                            'primary': loaded_data['settings']['color_scheme'].get('primary', '#2563EB'),
+                            'secondary': loaded_data['settings']['color_scheme'].get('secondary', '#10B981'),
+                            'accent': loaded_data['settings']['color_scheme'].get('accent', '#F59E0B')
+                        },
+                        'font_family': loaded_data['settings'].get('default_font', 'Segoe UI'),
+                        'slides': loaded_data.get('slides', [])
+                    }
+                else:
+                    # Simple format (old Template Builder format)
+                    self.template_data = loaded_data
 
-            # Update colors
-            for color_type in ['primary', 'secondary', 'accent']:
-                color = self.template_data['colors'].get(color_type, '#000000')
-                if color_type == 'primary':
-                    self.primary_color_btn.setStyleSheet(f"background-color: {color};")
-                    self.primary_color_label.setText(color)
-                elif color_type == 'secondary':
-                    self.secondary_color_btn.setStyleSheet(f"background-color: {color};")
-                    self.secondary_color_label.setText(color)
-                elif color_type == 'accent':
-                    self.accent_color_btn.setStyleSheet(f"background-color: {color};")
-                    self.accent_color_label.setText(color)
+                # Update UI from loaded data
+                self.template_name_input.setText(self.template_data.get('name', ''))
 
-            # Update font
-            self.font_combo.setCurrentText(self.template_data.get('font_family', 'Segoe UI'))
+                # Set industry if it exists in combo box
+                industry = self.template_data.get('industry', '')
+                index = self.industry_combo.findText(industry)
+                if index >= 0:
+                    self.industry_combo.setCurrentIndex(index)
+                else:
+                    self.industry_combo.setCurrentText(industry)
 
-            # Load slides
-            self.slide_list.clear()
-            for i, slide in enumerate(self.template_data.get('slides', [])):
-                self.slide_list.addItem(f"{i + 1}. {slide['name']}")
+                # Update colors
+                colors = self.template_data.get('colors', {})
+                for color_type in ['primary', 'secondary', 'accent']:
+                    color = colors.get(color_type, '#000000')
+                    if color_type == 'primary':
+                        self.primary_color_btn.setStyleSheet(f"background-color: {color};")
+                        self.primary_color_label.setText(color)
+                    elif color_type == 'secondary':
+                        self.secondary_color_btn.setStyleSheet(f"background-color: {color};")
+                        self.secondary_color_label.setText(color)
+                    elif color_type == 'accent':
+                        self.accent_color_btn.setStyleSheet(f"background-color: {color};")
+                        self.accent_color_label.setText(color)
 
-            QMessageBox.information(
+                # Update font
+                font_family = self.template_data.get('font_family', 'Segoe UI')
+                index = self.font_combo.findText(font_family)
+                if index >= 0:
+                    self.font_combo.setCurrentIndex(index)
+
+                # Load slides
+                self.slide_list.clear()
+                for i, slide in enumerate(self.template_data.get('slides', [])):
+                    self.slide_list.addItem(f"{i + 1}. {slide['name']}")
+
+                # Select first slide if available
+                if self.slide_list.count() > 0:
+                    self.slide_list.setCurrentRow(0)
+
+                QMessageBox.information(
+                    self,
+                    "Template Loaded",
+                    f"Template loaded successfully!\n\n"
+                    f"Name: {self.template_data['name']}\n"
+                    f"Industry: {self.template_data.get('industry', 'N/A')}\n"
+                    f"Slides: {len(self.template_data.get('slides', []))}"
+                )
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Load Error",
+                    f"Failed to load template:\n{str(e)}"
+                )
+
+    def delete_template(self):
+        """Delete an existing template from templates/configs/"""
+        import os
+
+        default_dir = os.path.join(os.getcwd(), "templates", "configs")
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Template to Delete",
+            default_dir if os.path.exists(default_dir) else "",
+            "JSON Files (*.json);;All Files (*.*)"
+        )
+
+        if file_path:
+            # Get template name for confirmation
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    loaded_data = json.load(f)
+
+                if 'metadata' in loaded_data:
+                    template_name = loaded_data['metadata'].get('name', os.path.basename(file_path))
+                else:
+                    template_name = loaded_data.get('name', os.path.basename(file_path))
+            except Exception:
+                template_name = os.path.basename(file_path)
+
+            # Confirm deletion
+            reply = QMessageBox.question(
                 self,
-                "Template Loaded",
-                f"Template loaded successfully:\n{self.template_data['name']}"
+                "Delete Template",
+                f"Are you sure you want to delete this template?\n\n"
+                f"Template: {template_name}\n"
+                f"File: {os.path.basename(file_path)}\n\n"
+                f"This action cannot be undone!",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                try:
+                    os.remove(file_path)
+                    QMessageBox.information(
+                        self,
+                        "Template Deleted",
+                        f"Template '{template_name}' has been deleted successfully."
+                    )
+
+                    # If the deleted template was currently loaded, clear the UI
+                    if self.template_data.get('name') == template_name:
+                        self.template_data = {
+                            'name': '',
+                            'industry': '',
+                            'logo_path': None,
+                            'colors': {
+                                'primary': '#2563EB',
+                                'secondary': '#10B981',
+                                'accent': '#F59E0B'
+                            },
+                            'font_family': 'Segoe UI',
+                            'slides': []
+                        }
+                        self.template_name_input.clear()
+                        self.slide_list.clear()
+
+                except Exception as e:
+                    QMessageBox.critical(
+                        self,
+                        "Delete Error",
+                        f"Failed to delete template:\n{str(e)}"
+                    )
 
     def export_template(self):
         """Export template as JSON"""
