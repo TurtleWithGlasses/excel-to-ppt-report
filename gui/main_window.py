@@ -13,30 +13,61 @@ from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QPainter
 import os
 from datetime import datetime
 
+# Import core PPTGenerator
+try:
+    from core import PPTGenerator
+    CORE_AVAILABLE = True
+except ImportError:
+    CORE_AVAILABLE = False
+    print("Warning: Core engine not available. Using simulation mode.")
+
 
 class ReportGeneratorThread(QThread):
     """Background thread for report generation"""
     progress = pyqtSignal(int, str)  # (percentage, message)
-    finished = pyqtSignal(bool, str)  # (success, message)
+    finished = pyqtSignal(bool, str, str)  # (success, message, output_path)
 
-    def __init__(self, excel_path, template_name, report_name):
+    def __init__(self, excel_path, template_path, output_path, variables):
         super().__init__()
         self.excel_path = excel_path
-        self.template_name = template_name
-        self.report_name = report_name
+        self.template_path = template_path
+        self.output_path = output_path
+        self.variables = variables
 
     def run(self):
         """Generate report in background"""
         try:
-            # Simulate report generation
-            # TODO: Replace with actual PPT generation logic
-            for i in range(1, 101, 10):
-                self.progress.emit(i, f"Generating slides... {i}% complete")
-                self.msleep(200)  # Simulate work
+            if CORE_AVAILABLE:
+                # Use actual PPTGenerator
+                self.progress.emit(10, "Initializing generator...")
+                generator = PPTGenerator()
 
-            self.finished.emit(True, "Report generated successfully!")
+                self.progress.emit(20, "Loading template...")
+                generator.load_template(self.template_path)
+
+                self.progress.emit(40, "Loading data...")
+                generator.load_data(self.excel_path)
+
+                self.progress.emit(60, "Setting variables...")
+                generator.set_variables(self.variables)
+
+                self.progress.emit(80, "Generating PowerPoint...")
+                output = generator.generate(self.output_path)
+
+                self.progress.emit(100, "Complete!")
+                self.finished.emit(True, "Report generated successfully!", output)
+            else:
+                # Simulation mode
+                for i in range(1, 101, 10):
+                    self.progress.emit(i, f"Generating slides... {i}% complete")
+                    self.msleep(200)
+
+                self.finished.emit(True, "Report generated (simulation mode)!", self.output_path)
+
         except Exception as e:
-            self.finished.emit(False, f"Error: {str(e)}")
+            import traceback
+            error_msg = f"Error: {str(e)}\n\n{traceback.format_exc()}"
+            self.finished.emit(False, error_msg, "")
 
 
 class StepButton(QPushButton):
@@ -123,13 +154,23 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.excel_path = None
         self.template_name = None
+        self.template_path = None
         self.generated_slides = []
         self.current_slide_index = 0
+
+        # Map template names to file paths
+        self.template_map = {
+            "BSH Monthly Media Report": "templates/configs/BSH_Template.json",
+            "Sanofi Pharma Media Report": "templates/configs/Sanofi_Template.json",
+            "SOCAR Energy Sector Template": "templates/configs/SOCAR_Template.json"
+        }
+
         self.init_ui()
 
     def init_ui(self):
         """Initialize user interface"""
-        self.setGeometry(100, 100, 1366, 768)
+        # Start in full-screen mode
+        self.showMaximized()
         self.setMinimumSize(1024, 768)
 
         # Create central widget
@@ -458,19 +499,34 @@ class MainWindow(QMainWindow):
                 )
                 if reply == QMessageBox.StandardButton.Yes:
                     self.open_template_builder()
+            elif self.template_name.startswith("---"):
+                # Category header, ignore
+                QMessageBox.information(self, "Category", "Please select an actual template, not a category header.")
+                return
             else:
+                # Map template name to path
+                self.template_path = self.template_map.get(self.template_name)
+
+                if not self.template_path or not os.path.exists(self.template_path):
+                    QMessageBox.warning(
+                        self,
+                        "Template Not Found",
+                        f"Template file not found for:\n{self.template_name}\n\nPlease select a valid template."
+                    )
+                    return
+
                 self.step2_btn.mark_completed()
                 self.step3_btn.mark_active()
                 QMessageBox.information(
                     self,
                     "Template Selected",
-                    f"Selected template:\n{self.template_name}"
+                    f"Selected template:\n{self.template_name}\n\nPath: {self.template_path}"
                 )
 
     # Step 3: Prepare Report
     def prepare_report(self):
         """Generate PowerPoint report"""
-        if not self.excel_path or not self.template_name:
+        if not self.excel_path or not self.template_path:
             QMessageBox.warning(
                 self,
                 "Missing Information",
@@ -483,6 +539,23 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "No Report Name", "Please enter a report name!")
             return
 
+        # Create output directory if it doesn't exist
+        output_dir = "output"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Generate output path
+        output_path = os.path.join(output_dir, f"{report_name}.pptx")
+
+        # Prepare variables for text substitution
+        from datetime import datetime
+        now = datetime.now()
+        variables = {
+            'month': now.strftime('%B'),  # Full month name
+            'year': now.strftime('%Y'),
+            'date': now.strftime('%Y-%m-%d'),
+            'report_name': report_name
+        }
+
         # Show progress bar
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
@@ -490,8 +563,9 @@ class MainWindow(QMainWindow):
         # Start generation thread
         self.generator_thread = ReportGeneratorThread(
             self.excel_path,
-            self.template_name,
-            report_name
+            self.template_path,
+            output_path,
+            variables
         )
         self.generator_thread.progress.connect(self.update_progress)
         self.generator_thread.finished.connect(self.generation_finished)
@@ -502,12 +576,15 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(percentage)
         self.progress_bar.setFormat(message)
 
-    def generation_finished(self, success, message):
+    def generation_finished(self, success, message, output_path):
         """Handle report generation completion"""
         self.progress_bar.setVisible(False)
 
         if success:
-            # Simulate generated slides
+            # Store the output path
+            self.output_path = output_path
+
+            # Simulate generated slides (for preview - in real implementation, could load from PPTX)
             self.generated_slides = [f"Slide {i}" for i in range(1, 56)]
             self.current_slide_index = 0
 
@@ -517,7 +594,12 @@ class MainWindow(QMainWindow):
             self.show_slide(0)
             self.enable_slide_controls(True)
 
-            QMessageBox.information(self, "Success", message)
+            # Show success message with file location
+            QMessageBox.information(
+                self,
+                "Success",
+                f"{message}\n\nFile saved to:\n{output_path}"
+            )
         else:
             QMessageBox.critical(self, "Error", message)
 
