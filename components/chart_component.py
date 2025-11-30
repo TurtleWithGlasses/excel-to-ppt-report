@@ -5,14 +5,12 @@ Used for: Bar charts, column charts, pie charts, line charts, trend analysis
 Supports: Multiple chart types, custom colors, legends, axes labels
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from pptx.slide import Slide
-from pptx.util import Inches
 from components.base_component import BaseComponent
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
-from io import BytesIO
 import os
 import tempfile
 import warnings
@@ -142,8 +140,8 @@ class ChartComponent(BaseComponent):
             if os.path.exists(chart_image_path):
                 try:
                     os.unlink(chart_image_path)
-                except:
-                    pass
+                except OSError:
+                    pass  # File already deleted or doesn't exist
 
     def _prepare_data(self, data: Any) -> Optional[pd.DataFrame]:
         """
@@ -212,17 +210,27 @@ class ChartComponent(BaseComponent):
         """
         try:
             # Set figure size based on component dimensions (limit to reasonable values)
-            fig_width = min(self.width.inches, 20)  # Max 20 inches
-            fig_height = min(self.height.inches, 15)  # Max 15 inches
+            # Ensure we have valid numeric values
+            try:
+                raw_width = float(self.width.inches)
+                raw_height = float(self.height.inches)
+            except (ValueError, AttributeError, TypeError):
+                raw_width = 9.0
+                raw_height = 5.0
+
+            # Clamp to reasonable bounds
+            fig_width = max(1.0, min(raw_width, 20.0))  # Between 1 and 20 inches
+            fig_height = max(1.0, min(raw_height, 15.0))  # Between 1 and 15 inches
 
             # Use lower DPI to prevent huge images
             dpi = 100  # Reduced from 150
 
-            # Check if resulting image would be too large
-            max_pixels = 10000  # Max dimension in pixels
+            # Check if resulting image would be too large (max 2^16 = 65536)
+            max_pixels = 10000  # Conservative limit
             if fig_width * dpi > max_pixels or fig_height * dpi > max_pixels:
-                # Scale down DPI to fit
-                dpi = int(min(max_pixels / fig_width, max_pixels / fig_height))
+                # Scale down DPI to fit within limits
+                dpi = int(min(max_pixels / fig_width, max_pixels / fig_height, dpi))
+                dpi = max(50, dpi)  # Minimum 50 DPI for readability
 
             fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=dpi)
 
