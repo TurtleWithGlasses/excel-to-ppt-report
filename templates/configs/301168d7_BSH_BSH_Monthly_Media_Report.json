@@ -1,0 +1,85 @@
+{
+  "template_id": "301168d7",
+  "name": "BSH Monthly Media Report",
+  "client": "BSH",
+  "description": "Monthly media analysis report for BSH and competitors",
+  "ppt_template_path": "templates/BSH Kasım Ayı Aylık Medya Yansıma Raporu 24.pptx",
+  "created_at": "2025-11-29T11:48:52.267810",
+  "updated_at": "2025-11-29T11:48:52.267810",
+  "version": "1.0",
+  "data_mapping": {
+    "sheet_name": "BSH",
+    "columns": {
+      "Firma": "company",
+      "Erişim": "reach",
+      "StxCm": "stxcm",
+      "Reklam Eşdeğeri": "ad_value",
+      "Editör": "sentiment"
+    },
+    "filters": []
+  },
+  "slides": [
+    {
+      "slide_index": 0,
+      "slide_type": "table",
+      "title": "Monthly Summary",
+      "components": [
+        {
+          "type": "table",
+          "columns": [
+            "Kurum",
+            "Toplam",
+            "Pozitif",
+            "Negatif",
+            "Erişim",
+            "STXCM",
+            "Reklam Eşdeğeri"
+          ],
+          "position": {
+            "left": 0.5,
+            "top": 1.5,
+            "width": 9,
+            "height": 5
+          },
+          "styling": {
+            "header_bold": true,
+            "header_font_size": 12,
+            "data_font_size": 11,
+            "alternating_rows": true
+          }
+        }
+      ]
+    }
+  ],
+  "processing_rules": {
+    "sort_by": "Toplam",
+    "sort_order": "descending",
+    "aggregations": [
+      {
+        "type": "group_by",
+        "columns": [
+          "Firma",
+          "Editör"
+        ],
+        "aggregation": "count"
+      },
+      {
+        "type": "sum",
+        "columns": [
+          "Erişim",
+          "StxCm",
+          "Reklam Eşdeğeri"
+        ],
+        "group_by": "Firma"
+      }
+    ]
+  },
+  "formatting": {
+    "number_format": {
+      "decimal_places": 2,
+      "use_thousands_separator": true
+    },
+    "date_format": "%Y-%m-%d",
+    "currency_symbol": "₺"
+  }
+}

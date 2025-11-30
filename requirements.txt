@@ -1,0 +1,36 @@
+# ReportForge - Requirements
+# Universal PowerPoint Report Generation System
+
+# Core Dependencies
+python-pptx==0.6.23          # PowerPoint file generation
+pandas==2.1.4                 # Excel data processing and manipulation
+openpyxl==3.1.2              # Excel file reading (.xlsx)
+xlrd==2.0.1                  # Excel file reading (.xls) - legacy support
+
+# GUI Framework
+PyQt6==6.6.1                 # Main GUI framework
+PyQt6-Qt6==6.6.1             # Qt6 bindings
+PyQt6-sip==13.6.0            # Python bindings for Qt6
+
+# Data Visualization (for chart generation in PPT)
+matplotlib==3.8.2            # Chart rendering
+pillow==10.1.0               # Image processing for charts and logos
+
+# Utilities
+python-dateutil==2.8.2       # Date parsing and formatting
+numpy==1.26.2                # Numerical operations (pandas dependency)
+
+# Optional: AI-Powered Insights (Future Feature)
+anthropic==0.7.8           # Claude API for auto-generated summaries
+# openai==1.6.1              # OpenAI API alternative
+
+# Development Dependencies
+pytest==7.4.3                # Testing framework
+pytest-qt==4.2.0             # Qt testing support
+black==23.12.1               # Code formatting
+flake8==7.0.0                # Code linting
+mypy==1.7.1                  # Type checking
+
+# Documentation
+sphinx==7.2.6                # Documentation generation
+sphinx-rtd-theme==2.0.0      # ReadTheDocs theme

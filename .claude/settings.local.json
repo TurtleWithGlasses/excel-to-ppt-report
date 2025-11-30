@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(git add:*)",
+      "Bash(git init:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Complete backend system with templates and core engine\n\n- Added complete component library (6 components)\n  * BaseComponent: Abstract base with validation\n  * TextComponent: Text with variable substitution\n  * TableComponent: DataFrames to PowerPoint tables\n  * ImageComponent: Images and logos\n  * ChartComponent: 6 chart types with matplotlib\n  * SummaryComponent: Auto-generated insights\n\n- Implemented core engine (4 modules)\n  * ComponentFactory: Create components from JSON\n  * DataMapper: Load and map Excel data\n  * TemplateManager: Template management\n  * PPTGenerator: Main generation engine\n\n- Created industry templates\n  * BSH Template: Consumer electronics (6 slides)\n  * Sanofi Template: Pharmaceutical (6 slides)\n  * SOCAR Template: Energy sector (7 slides)\n\n- Added testing suite\n  * test_components.py: Component tests\n  * test_core_engine.py: Engine integration tests\n  * test_templates.py: Template validation tests\n\n- Created sample data and documentation\n  * Sample Excel files for all 3 industries\n  * Comprehensive documentation (COMPLETE_COMPONENTS_SUMMARY.md, CORE_ENGINE_COMPLETE.md, TEMPLATES_COMPLETE.md, PROJECT_STATUS.md)\n  * Updated README.md to reflect v3.0\n\nTotal: ~5,660 lines of production code\nStatus: Backend complete, ready for GUI integration\n\nGenerated with Claude Code\nhttps://claude.com/claude-code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

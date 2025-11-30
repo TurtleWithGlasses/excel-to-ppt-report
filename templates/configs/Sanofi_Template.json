@@ -1,0 +1,368 @@
+{
+  "metadata": {
+    "name": "Sanofi Pharmaceutical Media Monitoring Report",
+    "description": "Monthly media analysis report for Sanofi and pharmaceutical competitors",
+    "industry": "Pharmaceutical / Healthcare",
+    "author": "ReportForge",
+    "version": "1.0",
+    "created_date": "2025-01-15",
+    "modified_date": "2025-01-15"
+  },
+  "settings": {
+    "page_size": "16:9",
+    "default_font": "Calibri",
+    "default_font_size": 11,
+    "color_scheme": {
+      "primary": "#7C3AED",
+      "secondary": "#10B981",
+      "accent": "#F59E0B",
+      "positive": "#10B981",
+      "negative": "#EF4444",
+      "neutral": "#6B7280",
+      "text": "#1F2937",
+      "background": "#FFFFFF"
+    }
+  },
+  "slides": [
+    {
+      "name": "Title Slide",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Sanofi ve Rakipleri",
+          "position": {"x": 0.5, "y": 1.8},
+          "size": {"width": 9.0, "height": 0.9},
+          "style": {
+            "font_name": "Calibri",
+            "font_size": 44,
+            "bold": true,
+            "alignment": "center",
+            "color": "#7C3AED"
+          }
+        },
+        {
+          "type": "text",
+          "content": "Medya Analizi Raporu",
+          "position": {"x": 0.5, "y": 2.8},
+          "size": {"width": 9.0, "height": 0.8},
+          "style": {
+            "font_size": 32,
+            "bold": true,
+            "alignment": "center",
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "text",
+          "content": "{month} {year}",
+          "position": {"x": 0.5, "y": 3.8},
+          "size": {"width": 9.0, "height": 0.7},
+          "style": {
+            "font_size": 24,
+            "alignment": "center",
+            "color": "#6B7280"
+          }
+        },
+        {
+          "type": "text",
+          "content": "İlaç Sektörü - Medya Takip Raporu",
+          "position": {"x": 0.5, "y": 4.6},
+          "size": {"width": 9.0, "height": 0.5},
+          "style": {
+            "font_size": 14,
+            "alignment": "center",
+            "color": "#9CA3AF"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Executive Summary",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Yönetici Özeti",
+          "position": {"x": 0.5, "y": 0.5},
+          "size": {"width": 9.0, "height": 0.7},
+          "style": {
+            "font_size": 32,
+            "bold": true,
+            "alignment": "left",
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "summary",
+          "position": {"x": 0.5, "y": 1.4},
+          "size": {"width": 9.0, "height": 1.8},
+          "data_source": {
+            "insight_types": ["key_metrics", "highlights"],
+            "metric_columns": ["TOTAL", "OLUMLU", "OLUMSUZ"],
+            "compare_column": "FİRMALAR",
+            "max_items": 4
+          },
+          "style": {
+            "layout": "callout_boxes",
+            "show_icons": true,
+            "highlight_color": "#F5F3FF",
+            "font_size": 13
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "column",
+          "position": {"x": 0.5, "y": 3.5},
+          "size": {"width": 9.0, "height": 3.3},
+          "data_source": {
+            "x_column": "FİRMALAR",
+            "y_column": "TOTAL",
+            "sort_by": "TOTAL",
+            "ascending": false,
+            "top_n": 10
+          },
+          "style": {
+            "colors": ["#7C3AED"],
+            "show_values": true,
+            "title": "İlaç Firmalarına Göre Toplam Haber Sayısı",
+            "y_label": "Haber Sayısı",
+            "grid": true,
+            "legend_position": "none"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Company Comparison",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Firma Karşılaştırması",
+          "position": {"x": 0.5, "y": 0.4},
+          "size": {"width": 9.0, "height": 0.6},
+          "style": {
+            "font_size": 28,
+            "bold": true,
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "table",
+          "position": {"x": 0.5, "y": 1.2},
+          "size": {"width": 9.0, "height": 3.2},
+          "data_source": {
+            "columns": ["FİRMALAR", "OLUMLU", "OLUMSUZ", "TOTAL"],
+            "sort_by": "TOTAL",
+            "ascending": false,
+            "top_n": 15
+          },
+          "style": {
+            "header_row": true,
+            "zebra_striping": true,
+            "border": true,
+            "header_color": "#7C3AED",
+            "header_text_color": "#FFFFFF",
+            "row_color_1": "#FFFFFF",
+            "row_color_2": "#F9FAFB",
+            "text_color": "#1F2937",
+            "font_name": "Calibri",
+            "font_size": 10
+          }
+        },
+        {
+          "type": "summary",
+          "position": {"x": 0.5, "y": 4.6},
+          "size": {"width": 9.0, "height": 2.2},
+          "data_source": {
+            "insight_types": ["comparisons", "top_performers"],
+            "metric_columns": ["TOTAL", "OLUMLU"],
+            "compare_column": "FİRMALAR",
+            "max_items": 4
+          },
+          "style": {
+            "layout": "bullets",
+            "show_icons": true,
+            "font_size": 13
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sentiment Distribution",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Algı Dağılımı",
+          "position": {"x": 0.5, "y": 0.4},
+          "size": {"width": 9.0, "height": 0.6},
+          "style": {
+            "font_size": 28,
+            "bold": true,
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "stacked_column",
+          "position": {"x": 0.5, "y": 1.2},
+          "size": {"width": 9.0, "height": 3.5},
+          "data_source": {
+            "x_column": "FİRMALAR",
+            "y_column": "value",
+            "series_column": "sentiment_type",
+            "top_n": 10
+          },
+          "style": {
+            "colors": ["#10B981", "#EF4444"],
+            "show_values": false,
+            "title": "Firmalara Göre Olumlu/Olumsuz Haber Dağılımı",
+            "y_label": "Haber Sayısı",
+            "grid": true,
+            "legend_position": "bottom"
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "pie",
+          "position": {"x": 0.5, "y": 5.0},
+          "size": {"width": 4.5, "height": 2.0},
+          "data_source": {
+            "x_column": "FİRMALAR",
+            "y_column": "OLUMLU",
+            "top_n": 8
+          },
+          "style": {
+            "colors": ["#10B981", "#34D399", "#6EE7B7", "#A7F3D0", "#D1FAE5", "#059669", "#047857", "#065F46"],
+            "show_values": true,
+            "title": "Olumlu Haberlerde Firma Payları"
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "pie",
+          "position": {"x": 5.2, "y": 5.0},
+          "size": {"width": 4.3, "height": 2.0},
+          "data_source": {
+            "x_column": "FİRMALAR",
+            "y_column": "OLUMSUZ",
+            "top_n": 8
+          },
+          "style": {
+            "colors": ["#EF4444", "#F87171", "#FCA5A5", "#FECACA", "#FEE2E2", "#DC2626", "#B91C1C", "#991B1B"],
+            "show_values": true,
+            "title": "Olumsuz Haberlerde Firma Payları"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Top Companies Analysis",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Önde Gelen Firmalar",
+          "position": {"x": 0.5, "y": 0.4},
+          "size": {"width": 9.0, "height": 0.6},
+          "style": {
+            "font_size": 28,
+            "bold": true,
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "bar",
+          "position": {"x": 0.5, "y": 1.2},
+          "size": {"width": 9.0, "height": 3.5},
+          "data_source": {
+            "x_column": "FİRMALAR",
+            "y_column": "TOTAL",
+            "sort_by": "TOTAL",
+            "ascending": false,
+            "top_n": 12
+          },
+          "style": {
+            "colors": ["#7C3AED"],
+            "show_values": true,
+            "title": "En Çok Habere Konu Olan İlaç Firmaları",
+            "x_label": "Haber Sayısı",
+            "grid": true,
+            "legend_position": "none"
+          }
+        },
+        {
+          "type": "summary",
+          "position": {"x": 0.5, "y": 5.0},
+          "size": {"width": 9.0, "height": 1.8},
+          "data_source": {
+            "insight_types": ["highlights", "top_performers"],
+            "metric_columns": ["TOTAL"],
+            "compare_column": "FİRMALAR",
+            "max_items": 3
+          },
+          "style": {
+            "layout": "numbered",
+            "show_icons": true,
+            "font_size": 14
+          }
+        }
+      ]
+    },
+    {
+      "name": "Market Share Overview",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Pazar Görünürlüğü",
+          "position": {"x": 0.5, "y": 0.4},
+          "size": {"width": 9.0, "height": 0.6},
+          "style": {
+            "font_size": 28,
+            "bold": true,
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "pie",
+          "position": {"x": 0.5, "y": 1.2},
+          "size": {"width": 9.0, "height": 3.5},
+          "data_source": {
+            "x_column": "FİRMALAR",
+            "y_column": "TOTAL",
+            "top_n": 10
+          },
+          "style": {
+            "colors": ["#7C3AED", "#A78BFA", "#C4B5FD", "#DDD6FE", "#EDE9FE", "#6D28D9", "#5B21B6", "#4C1D95", "#10B981", "#F59E0B"],
+            "show_values": true,
+            "title": "Medya Görünürlük Payları (%)"
+          }
+        },
+        {
+          "type": "table",
+          "position": {"x": 0.5, "y": 5.0},
+          "size": {"width": 9.0, "height": 1.8},
+          "data_source": {
+            "columns": ["FİRMALAR", "OLUMLU", "OLUMSUZ", "TOTAL"],
+            "sort_by": "TOTAL",
+            "ascending": false,
+            "top_n": 5
+          },
+          "style": {
+            "header_row": true,
+            "zebra_striping": true,
+            "border": true,
+            "header_color": "#7C3AED",
+            "header_text_color": "#FFFFFF",
+            "font_size": 11
+          }
+        }
+      ]
+    }
+  ]
+}
