@@ -312,10 +312,11 @@ class TemplateBuilder(QMainWindow):
         group.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         layout = QVBoxLayout(group)
 
-        # Slide list
+        # Slide list with inline editing
         self.slide_list = QListWidget()
         self.slide_list.setMaximumHeight(200)
         self.slide_list.currentRowChanged.connect(self.slide_selected)
+        self.slide_list.itemChanged.connect(self.slide_renamed)
         layout.addWidget(self.slide_list)
 
         # Slide management buttons
@@ -620,7 +621,11 @@ class TemplateBuilder(QMainWindow):
             }
 
             self.template_data['slides'].append(slide_data)
-            self.slide_list.addItem(f"{len(self.template_data['slides'])}. {slide_name}")
+
+            # Add item with editable flag
+            item = QListWidgetItem(f"{len(self.template_data['slides'])}. {slide_name}")
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            self.slide_list.addItem(item)
 
     def remove_slide(self):
         """Remove selected slide"""
@@ -672,6 +677,26 @@ class TemplateBuilder(QMainWindow):
             item = self.slide_list.item(i)
             slide_name = self.template_data['slides'][i]['name']
             item.setText(f"{i + 1}. {slide_name}")
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+
+    def slide_renamed(self, item):
+        """Handle slide rename (double-click to edit)"""
+        # Get the row index
+        row = self.slide_list.row(item)
+        if 0 <= row < len(self.template_data['slides']):
+            # Extract new name from "1. New Name" format
+            new_text = item.text()
+            # Remove number prefix "1. " to get just the name
+            if '. ' in new_text:
+                new_name = new_text.split('. ', 1)[1]
+            else:
+                new_name = new_text
+
+            # Update template data
+            self.template_data['slides'][row]['name'] = new_name
+
+            # Update the item text to ensure proper formatting
+            item.setText(f"{row + 1}. {new_name}")
 
     def slide_selected(self, index):
         """Handle slide selection"""
@@ -920,7 +945,9 @@ class TemplateBuilder(QMainWindow):
                 # Load slides
                 self.slide_list.clear()
                 for i, slide in enumerate(self.template_data.get('slides', [])):
-                    self.slide_list.addItem(f"{i + 1}. {slide['name']}")
+                    item = QListWidgetItem(f"{i + 1}. {slide['name']}")
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                    self.slide_list.addItem(item)
 
                 # Select first slide if available
                 if self.slide_list.count() > 0:
