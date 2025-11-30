@@ -77,8 +77,6 @@ class TemplateBuilder(QMainWindow):
 
     def init_ui(self):
         """Initialize user interface"""
-        # Start in full-screen mode
-        self.showMaximized()
         self.setMinimumSize(1200, 700)
 
         # Create central widget with splitter

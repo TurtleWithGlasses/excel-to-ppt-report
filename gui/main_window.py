@@ -169,8 +169,6 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         """Initialize user interface"""
-        # Start in full-screen mode
-        self.showMaximized()
         self.setMinimumSize(1024, 768)
 
         # Create central widget
@@ -710,10 +708,10 @@ class MainWindow(QMainWindow):
         """Open Template Builder window"""
         from gui.template_builder import TemplateBuilder
 
-        # Create and show Template Builder window
+        # Create and show Template Builder window in full-screen
         self.template_builder_window = TemplateBuilder()
         self.template_builder_window.setWindowTitle("ReportForge - Template Builder")
-        self.template_builder_window.show()
+        self.template_builder_window.showMaximized()
 
         # Optional: Connect signal to refresh templates when builder closes
         self.template_builder_window.destroyed.connect(self.refresh_templates)

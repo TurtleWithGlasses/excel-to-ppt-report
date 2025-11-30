@@ -34,8 +34,8 @@ def main():
         window = MainWindow()
         window.setWindowTitle("ReportForge - Report Generator")
 
-    # Show window
-    window.show()
+    # Show window in full-screen mode
+    window.showMaximized()
 
     # Start event loop
     sys.exit(app.exec())
