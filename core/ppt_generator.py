@@ -244,8 +244,17 @@ class PPTGenerator:
             # Render component
             component.render(slide, component_data)
 
+        except IndexError as e:
+            # Handle tuple/list index errors specifically
+            import traceback
+            print(f"Warning: Failed to render component (index error): {str(e)}")
+            print(f"Component config: {component_config.get('type', 'unknown')}")
+            traceback.print_exc()
+            # Continue with other components
         except Exception as e:
             print(f"Warning: Failed to render component: {str(e)}")
+            import traceback
+            traceback.print_exc()  # Print full traceback for debugging
             # Continue with other components
 
     def _generate_output_path(self, template: Dict[str, Any]) -> str:

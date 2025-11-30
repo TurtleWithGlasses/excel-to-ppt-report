@@ -218,18 +218,13 @@ class ChartComponent(BaseComponent):
                 raw_width = 9.0
                 raw_height = 5.0
 
-            # DEBUG: Print values to help diagnose
-            print(f"[DEBUG] Raw dimensions: {raw_width}x{raw_height} inches")
-
             # Clamp to reasonable bounds - FORCE to safe values
             if raw_width > 20.0 or raw_width < 1.0:
-                print(f"[DEBUG] Clamping width from {raw_width} to 20.0")
                 fig_width = 20.0 if raw_width > 20.0 else 9.0
             else:
                 fig_width = raw_width
 
             if raw_height > 15.0 or raw_height < 1.0:
-                print(f"[DEBUG] Clamping height from {raw_height} to 15.0")
                 fig_height = 15.0 if raw_height > 15.0 else 5.0
             else:
                 fig_height = raw_height
@@ -237,16 +232,12 @@ class ChartComponent(BaseComponent):
             # Use lower DPI to prevent huge images
             dpi = 100  # Reduced from 150
 
-            print(f"[DEBUG] Final dimensions: {fig_width}x{fig_height} inches at {dpi} DPI = {fig_width*dpi}x{fig_height*dpi} pixels")
-
             # Check if resulting image would be too large (max 2^16 = 65536)
             max_pixels = 10000  # Conservative limit
             if fig_width * dpi > max_pixels or fig_height * dpi > max_pixels:
                 # Scale down DPI to fit within limits
-                old_dpi = dpi
                 dpi = int(min(max_pixels / fig_width, max_pixels / fig_height, dpi))
                 dpi = max(50, dpi)  # Minimum 50 DPI for readability
-                print(f"[DEBUG] Scaled DPI from {old_dpi} to {dpi}")
 
             # Set matplotlib's default figsize and dpi to prevent pandas .plot() from creating huge figures
             # This is critical because pandas DataFrame.plot() creates figures internally using rcParams
@@ -298,9 +289,7 @@ class ChartComponent(BaseComponent):
             if expected_width_px > MAX_DIMENSION_PX or expected_height_px > MAX_DIMENSION_PX:
                 # Scale down if still too large
                 scale_factor = min(MAX_DIMENSION_PX / expected_width_px, MAX_DIMENSION_PX / expected_height_px, 1.0)
-                new_dpi = max(50, int(dpi * scale_factor))
-                print(f"[DEBUG] Scaling DPI from {dpi} to {new_dpi} to fit within {MAX_DIMENSION_PX}px limit")
-                dpi = new_dpi
+                dpi = max(50, int(dpi * scale_factor))
                 expected_width_px = int(fig_width * dpi)
                 expected_height_px = int(fig_height * dpi)
 
@@ -321,7 +310,6 @@ class ChartComponent(BaseComponent):
                 with Image.open(temp_path) as img:
                     actual_width, actual_height = img.size
                     if actual_width > MAX_DIMENSION_PX or actual_height > MAX_DIMENSION_PX:
-                        print(f"[WARNING] Saved image is {actual_width}x{actual_height}px, exceeds {MAX_DIMENSION_PX}px limit")
                         # Resize if needed
                         if actual_width > MAX_DIMENSION_PX:
                             scale = MAX_DIMENSION_PX / actual_width
@@ -329,11 +317,10 @@ class ChartComponent(BaseComponent):
                             new_height = int(actual_height * scale)
                             img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                             img_resized.save(temp_path)
-                            print(f"[DEBUG] Resized image to {new_width}x{new_height}px")
             except ImportError:
                 pass  # PIL not available, skip verification
-            except Exception as e:
-                print(f"[DEBUG] Could not verify image size: {e}")
+            except Exception:
+                pass  # Could not verify image size, continue anyway
             
             plt.close(fig)
 

@@ -169,13 +169,21 @@ class TableComponent(BaseComponent):
         """
         for col_idx, col_name in enumerate(columns):
             cell = table.cell(0, col_idx)
-            cell.text = str(col_name)
-
-            # Header formatting
-            paragraph = cell.text_frame.paragraphs[0]
+            
+            # Clear existing content
+            text_frame = cell.text_frame
+            text_frame.clear()
+            
+            # Add paragraph and run explicitly
+            paragraph = text_frame.paragraphs[0]
             paragraph.alignment = PP_ALIGN.CENTER
+            
+            # Add run with text
+            run = paragraph.add_run()
+            run.text = str(col_name)
 
-            font = paragraph.runs[0].font
+            # Header formatting - now we can safely access the run
+            font = run.font
             font.name = self.get_font_name()
             font.size = self.get_font_size(default=11)
             font.bold = True
@@ -201,11 +209,20 @@ class TableComponent(BaseComponent):
         for row_idx, (_, row) in enumerate(df.iterrows()):
             for col_idx, value in enumerate(row):
                 cell = table.cell(row_idx + row_offset, col_idx)
-                cell.text = self._format_value(value)
+                
+                # Clear existing content and create fresh text
+                text_frame = cell.text_frame
+                text_frame.clear()
+                
+                # Add paragraph and run explicitly
+                paragraph = text_frame.paragraphs[0]
+                
+                # Add run with formatted value
+                run = paragraph.add_run()
+                run.text = self._format_value(value)
 
-                # Cell formatting
-                paragraph = cell.text_frame.paragraphs[0]
-                font = paragraph.runs[0].font
+                # Cell formatting - now we can safely access the run
+                font = run.font
                 font.name = self.get_font_name()
                 font.size = self.get_font_size(default=10)
 
@@ -277,11 +294,17 @@ class TableComponent(BaseComponent):
             self.x, self.y, self.width, self.height
         )
         text_frame = text_box.text_frame
+        text_frame.clear()
+        
         paragraph = text_frame.paragraphs[0]
-        paragraph.text = "[No data available for table]"
         paragraph.alignment = PP_ALIGN.CENTER
 
-        font = paragraph.runs[0].font
+        # Add run explicitly
+        run = paragraph.add_run()
+        run.text = "[No data available for table]"
+
+        # Now we can safely access the font
+        font = run.font
         font.size = Pt(14)
         font.color.rgb = RGBColor(156, 163, 175)  # Gray
 
