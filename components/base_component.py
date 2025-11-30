@@ -49,8 +49,8 @@ class BaseComponent(ABC):
         # Style configuration
         self.style = config.get('style', {})
 
-        # Validate configuration
-        self.validate()
+        # Note: validate() should be called by subclasses after they set their attributes
+        # to avoid AttributeError when validate() tries to access subclass-specific attributes
 
     def validate(self) -> bool:
         """

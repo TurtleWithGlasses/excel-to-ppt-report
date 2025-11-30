@@ -62,6 +62,9 @@ class SummaryComponent(BaseComponent):
         self.show_icons = self.style.get('show_icons', True)
         self.highlight_color = self.style.get('highlight_color', '#2563EB')
 
+        # Validate after all attributes are set
+        self.validate()
+
     def validate(self) -> bool:
         """Validate summary component configuration."""
         super().validate()

@@ -48,6 +48,9 @@ class ImageComponent(BaseComponent):
         self.opacity = self.style.get('opacity', 100)
         self.maintain_aspect = self.style.get('maintain_aspect', True)
 
+        # Validate after all attributes are set
+        self.validate()
+
     def validate(self) -> bool:
         """Validate image component configuration."""
         super().validate()

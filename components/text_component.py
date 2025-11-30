@@ -38,6 +38,9 @@ class TextComponent(BaseComponent):
         self.content = config.get('content', '')
         self.variables = config.get('variables', {})
 
+        # Validate after all attributes are set
+        self.validate()
+
     def validate(self) -> bool:
         """Validate text component configuration."""
         super().validate()

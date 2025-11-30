@@ -57,6 +57,9 @@ class TableComponent(BaseComponent):
         self.sort_by = self.data_source.get('sort_by')
         self.ascending = self.data_source.get('ascending', True)
 
+        # Validate after all attributes are set
+        self.validate()
+
     def validate(self) -> bool:
         """Validate table component configuration."""
         super().validate()

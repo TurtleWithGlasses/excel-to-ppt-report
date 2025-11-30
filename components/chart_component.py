@@ -80,6 +80,9 @@ class ChartComponent(BaseComponent):
         self.show_grid = self.style.get('grid', True)
         self.chart_font_size = self.style.get('font_size', 10)
 
+        # Validate after all attributes are set
+        self.validate()
+
     def validate(self) -> bool:
         """Validate chart component configuration."""
         super().validate()
