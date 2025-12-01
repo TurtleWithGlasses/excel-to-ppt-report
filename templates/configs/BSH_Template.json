@@ -1,0 +1,380 @@
+{
+  "metadata": {
+    "name": "BSH Media Monitoring Report",
+    "description": "Monthly media analysis report for BSH and competitors (Arçelik, Vestel, Beko, Profilo)",
+    "industry": "Consumer Electronics / White Goods",
+    "author": "ReportForge",
+    "version": "1.0",
+    "created_date": "2025-01-15",
+    "modified_date": "2025-01-15"
+  },
+  "settings": {
+    "page_size": "16:9",
+    "default_font": "Calibri",
+    "default_font_size": 11,
+    "color_scheme": {
+      "primary": "#2563EB",
+      "secondary": "#10B981",
+      "accent": "#F59E0B",
+      "negative": "#EF4444",
+      "neutral": "#6B7280",
+      "text": "#1F2937",
+      "background": "#FFFFFF"
+    }
+  },
+  "slides": [
+    {
+      "name": "Title Slide",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "BSH ve Rakipleri Medya Analizi",
+          "position": {"x": 0.5, "y": 2.0},
+          "size": {"width": 9.0, "height": 1.0},
+          "style": {
+            "font_name": "Calibri",
+            "font_size": 40,
+            "bold": true,
+            "alignment": "center",
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "text",
+          "content": "{month} {year}",
+          "position": {"x": 0.5, "y": 3.2},
+          "size": {"width": 9.0, "height": 0.8},
+          "style": {
+            "font_size": 28,
+            "alignment": "center",
+            "color": "#2563EB"
+          }
+        },
+        {
+          "type": "text",
+          "content": "Beyaz Eşya Sektörü - Medya Takip Raporu",
+          "position": {"x": 0.5, "y": 4.2},
+          "size": {"width": 9.0, "height": 0.6},
+          "style": {
+            "font_size": 16,
+            "alignment": "center",
+            "color": "#6B7280"
+          }
+        },
+        {
+          "type": "text",
+          "content": "Rapor Tarihi: {date}",
+          "position": {"x": 0.5, "y": 5.0},
+          "size": {"width": 9.0, "height": 0.5},
+          "style": {
+            "font_size": 12,
+            "alignment": "center",
+            "color": "#9CA3AF"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Executive Summary",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Yönetici Özeti",
+          "position": {"x": 0.5, "y": 0.5},
+          "size": {"width": 9.0, "height": 0.7},
+          "style": {
+            "font_size": 32,
+            "bold": true,
+            "alignment": "left",
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "summary",
+          "position": {"x": 0.5, "y": 1.5},
+          "size": {"width": 9.0, "height": 2.0},
+          "data_source": {
+            "insight_types": ["key_metrics", "highlights"],
+            "metric_columns": ["Net Etki", "Erişim", "Reklam Eşdeğeri"],
+            "compare_column": "Firma",
+            "max_items": 5
+          },
+          "style": {
+            "layout": "callout_boxes",
+            "show_icons": true,
+            "highlight_color": "#EFF6FF",
+            "font_size": 13
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "column",
+          "position": {"x": 0.5, "y": 3.8},
+          "size": {"width": 9.0, "height": 3.0},
+          "data_source": {
+            "x_column": "Firma",
+            "y_column": "Net Etki",
+            "sort_by": "Net Etki",
+            "ascending": false
+          },
+          "style": {
+            "colors": ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+            "show_values": true,
+            "title": "Firmalara Göre Net Etki Karşılaştırması",
+            "y_label": "Net Etki",
+            "grid": true,
+            "legend_position": "none"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Media Coverage Overview",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Medya Kapsam Analizi",
+          "position": {"x": 0.5, "y": 0.4},
+          "size": {"width": 9.0, "height": 0.6},
+          "style": {
+            "font_size": 28,
+            "bold": true,
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "table",
+          "position": {"x": 0.5, "y": 1.2},
+          "size": {"width": 9.0, "height": 2.8},
+          "data_source": {
+            "columns": ["Firma", "Net Etki", "Erişim", "Reklam Eşdeğeri"],
+            "sort_by": "Net Etki",
+            "ascending": false
+          },
+          "style": {
+            "header_row": true,
+            "zebra_striping": true,
+            "border": true,
+            "header_color": "#2563EB",
+            "header_text_color": "#FFFFFF",
+            "row_color_1": "#FFFFFF",
+            "row_color_2": "#F9FAFB",
+            "text_color": "#1F2937",
+            "font_name": "Calibri",
+            "font_size": 11
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "pie",
+          "position": {"x": 0.5, "y": 4.2},
+          "size": {"width": 4.5, "height": 2.8},
+          "data_source": {
+            "x_column": "Firma",
+            "y_column": "Erişim"
+          },
+          "style": {
+            "colors": ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+            "show_values": true,
+            "title": "Erişim Dağılımı (%)"
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "pie",
+          "position": {"x": 5.2, "y": 4.2},
+          "size": {"width": 4.3, "height": 2.8},
+          "data_source": {
+            "x_column": "Firma",
+            "y_column": "Reklam Eşdeğeri"
+          },
+          "style": {
+            "colors": ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+            "show_values": true,
+            "title": "Reklam Eşdeğeri Dağılımı"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sentiment Analysis",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Algı Analizi",
+          "position": {"x": 0.5, "y": 0.4},
+          "size": {"width": 9.0, "height": 0.6},
+          "style": {
+            "font_size": 28,
+            "bold": true,
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "stacked_column",
+          "position": {"x": 0.5, "y": 1.2},
+          "size": {"width": 9.0, "height": 3.2},
+          "data_source": {
+            "x_column": "Firma",
+            "y_column": "Net Etki",
+            "series_column": "Algı"
+          },
+          "style": {
+            "colors": ["#10B981", "#6B7280", "#EF4444"],
+            "show_values": false,
+            "title": "Firmalara Göre Algı Dağılımı",
+            "y_label": "Net Etki",
+            "grid": true,
+            "legend_position": "bottom"
+          }
+        },
+        {
+          "type": "summary",
+          "position": {"x": 0.5, "y": 4.7},
+          "size": {"width": 9.0, "height": 2.0},
+          "data_source": {
+            "insight_types": ["comparisons", "top_performers"],
+            "metric_columns": ["Net Etki"],
+            "compare_column": "Firma",
+            "max_items": 4
+          },
+          "style": {
+            "layout": "bullets",
+            "show_icons": true,
+            "font_size": 13
+          }
+        }
+      ]
+    },
+    {
+      "name": "Media Type Distribution",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Medya Türü Dağılımı",
+          "position": {"x": 0.5, "y": 0.4},
+          "size": {"width": 9.0, "height": 0.6},
+          "style": {
+            "font_size": 28,
+            "bold": true,
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "bar",
+          "position": {"x": 0.5, "y": 1.2},
+          "size": {"width": 9.0, "height": 3.0},
+          "data_source": {
+            "x_column": "Medya Tür",
+            "y_column": "Net Etki",
+            "sort_by": "Net Etki",
+            "ascending": false,
+            "top_n": 8
+          },
+          "style": {
+            "colors": ["#2563EB"],
+            "show_values": true,
+            "title": "Medya Türlerine Göre Net Etki",
+            "x_label": "Net Etki",
+            "grid": true,
+            "legend_position": "none"
+          }
+        },
+        {
+          "type": "table",
+          "position": {"x": 0.5, "y": 4.5},
+          "size": {"width": 9.0, "height": 2.3},
+          "data_source": {
+            "columns": ["Medya Tür", "Net Etki", "Erişim"],
+            "sort_by": "Net Etki",
+            "ascending": false,
+            "top_n": 5
+          },
+          "style": {
+            "header_row": true,
+            "zebra_striping": true,
+            "border": true,
+            "header_color": "#2563EB",
+            "header_text_color": "#FFFFFF",
+            "font_size": 10
+          }
+        }
+      ]
+    },
+    {
+      "name": "Geographic Distribution",
+      "layout": "blank",
+      "components": [
+        {
+          "type": "text",
+          "content": "Coğrafi Dağılım",
+          "position": {"x": 0.5, "y": 0.4},
+          "size": {"width": 9.0, "height": 0.6},
+          "style": {
+            "font_size": 28,
+            "bold": true,
+            "color": "#1F2937"
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "column",
+          "position": {"x": 0.5, "y": 1.2},
+          "size": {"width": 9.0, "height": 3.0},
+          "data_source": {
+            "x_column": "Medya Şehir",
+            "y_column": "Net Etki",
+            "sort_by": "Net Etki",
+            "ascending": false,
+            "top_n": 10
+          },
+          "style": {
+            "colors": ["#10B981"],
+            "show_values": true,
+            "title": "Şehirlere Göre Medya Etkisi",
+            "y_label": "Net Etki",
+            "grid": true
+          }
+        },
+        {
+          "type": "chart",
+          "chart_type": "pie",
+          "position": {"x": 0.5, "y": 4.5},
+          "size": {"width": 4.5, "height": 2.3},
+          "data_source": {
+            "x_column": "Medya Kapsam",
+            "y_column": "Net Etki"
+          },
+          "style": {
+            "colors": ["#2563EB", "#10B981", "#F59E0B"],
+            "show_values": true,
+            "title": "Ulusal vs Yerel Medya"
+          }
+        },
+        {
+          "type": "summary",
+          "position": {"x": 5.2, "y": 4.5},
+          "size": {"width": 4.3, "height": 2.3},
+          "data_source": {
+            "insight_types": ["highlights"],
+            "metric_columns": ["Net Etki"],
+            "compare_column": "Medya Şehir",
+            "max_items": 3
+          },
+          "style": {
+            "layout": "numbered",
+            "show_icons": true,
+            "font_size": 12
+          }
+        }
+      ]
+    }
+  ]
+}

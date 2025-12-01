@@ -1,26 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init)",
-      "Bash(git config user.name \"TurtleWithGlasses\")",
-      "Bash(git config user.email \"user@example.com\")",
-      "Bash(git remote add origin https://github.com/TurtleWithGlasses/excel-to-ppt-report.git)",
-      "Bash(git add .)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Complete project setup with comprehensive documentation\n\nThis commit includes the complete foundation for the automated PPT report generation system:\n\n## Project Structure\n- FastAPI backend with RESTful API\n- SQLAlchemy models for database management\n- Service layer for business logic (Excel processing, PPT generation, AI analysis)\n- Alembic for database migrations\n- Docker configuration for containerized deployment\n\n## Core Features\n- User authentication and authorization\n- Client management system\n- Template management\n- Data upload and processing\n- Report generation engine\n- AI-powered data analysis (OpenAI integration)\n\n## Documentation\n- PROJECT_OVERVIEW.md: Complete project overview and architecture\n- AI_INTEGRATION_GUIDE.md: Comprehensive AI implementation guide\n- DATA_FLOW_GUIDE.md: Data pipeline and processing documentation\n- IMPLEMENTATION_CHECKLIST.md: Week-by-week development roadmap\n- SETUP.md: Setup and installation instructions\n- CONTRIBUTING.md: Contribution guidelines\n- API examples and template examples\n\n## Technology Stack\n- Python 3.11+\n- FastAPI for REST API\n- PostgreSQL for database\n- Redis for caching\n- Celery for async tasks\n- OpenAI API for AI features\n- python-pptx for PowerPoint generation\n- pandas for data processing\n\n## Next Steps\n- Complete Excel processor implementation\n- Enhance PPT generator with charts\n- Implement AI analysis module\n- Build frontend dashboard\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git branch -M main)",
-      "Bash(git push -u origin main)",
-      "Bash(python setup_env.py)",
-      "Bash(alembic upgrade head)",
-      "Bash(venv/Scripts/alembic.exe upgrade head)",
-      "Bash(python -m uvicorn app.main:app --reload)",
-      "Bash(venv/Scripts/pip install -r requirements.txt)",
-      "Bash(venv/Scripts/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000)",
-      "Bash(for file in app/models/client.py app/models/data_upload.py app/models/report.py app/models/template.py)",
-      "Bash(do sed -i 's/from sqlalchemy.dialects.postgresql import UUID/from app.utils.helpers import GUID/' \"$file\")",
-      "Bash(done)",
-      "Bash(curl http://127.0.0.1:8000/)",
-      "Bash(curl http://127.0.0.1:8000/health)",
-      "Bash(git add -A)"
+      "Bash(git commit:*)",
+      "Bash(find:*)",
+      "Bash(python:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
