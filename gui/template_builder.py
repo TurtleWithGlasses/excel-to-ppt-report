@@ -795,16 +795,20 @@ class TemplateBuilder(QMainWindow):
         title_label = QLabel("Title Slide Configuration")
         title_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         self.config_layout.addWidget(title_label)
-        
-        # Check if widgets exist and are valid, otherwise create new ones
+
+        # Get existing values from template_data
+        title_slide_settings = self.template_data.get('title_slide', {})
+
+        # Get existing values from widgets or template_data
         try:
             existing_title = self.title_slide_title_input.text() if hasattr(self, 'title_slide_title_input') and self.title_slide_title_input else ''
             existing_subtitle = self.title_slide_subtitle_input.text() if hasattr(self, 'title_slide_subtitle_input') and self.title_slide_subtitle_input else ''
             existing_description = self.title_slide_description_input.text() if hasattr(self, 'title_slide_description_input') and self.title_slide_description_input else ''
         except RuntimeError:
-            existing_title = ''
-            existing_subtitle = ''
-            existing_description = ''
+            # Widgets were deleted, fall back to template_data
+            existing_title = title_slide_settings.get('title', '')
+            existing_subtitle = title_slide_settings.get('subtitle', '')
+            existing_description = title_slide_settings.get('description', '')
         
         # Always create new widgets to avoid deleted widget issues
         self.title_slide_title_input = QLineEdit()
@@ -825,8 +829,12 @@ class TemplateBuilder(QMainWindow):
             self.title_slide_description_input.setText(existing_description)
         self.title_slide_description_input.textChanged.connect(self.on_title_slide_changed)
         
-        # Embedded logo label
-        if not hasattr(self, 'embedded_logo_path_label') or not self.embedded_logo_path_label:
+        # Embedded logo label - always recreate to avoid deleted widget issues
+        existing_logo = title_slide_settings.get('embedded_logo_path', '')
+        if existing_logo:
+            self.embedded_logo_path_label = QLabel(os.path.basename(existing_logo))
+            self.embedded_logo_path_label.setStyleSheet("color: #10B981; font-weight: bold;")
+        else:
             self.embedded_logo_path_label = QLabel("No embedded logo selected")
             self.embedded_logo_path_label.setStyleSheet("color: #6B7280;")
         
