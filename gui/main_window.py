@@ -577,8 +577,25 @@ class MainWindow(QMainWindow):
             # Store the output path
             self.output_path = output_path
 
-            # Simulate generated slides (for preview - in real implementation, could load from PPTX)
-            self.generated_slides = [f"Slide {i}" for i in range(1, 56)]
+            # Get actual slide count from generated PowerPoint
+            try:
+                from pptx import Presentation
+                prs = Presentation(output_path)
+                slide_count = len(prs.slides)
+                self.generated_slides = [f"Slide {i}" for i in range(1, slide_count + 1)]
+            except Exception as e:
+                print(f"Warning: Could not read slide count from PPTX: {e}")
+                # Fallback to reading template to estimate
+                try:
+                    import json
+                    with open(self.template_path, 'r', encoding='utf-8') as f:
+                        template_data = json.load(f)
+                    slide_count = len(template_data.get('slides', []))
+                    self.generated_slides = [f"Slide {i}" for i in range(1, slide_count + 1)]
+                except Exception:
+                    # Last resort fallback
+                    self.generated_slides = ["Slide 1"]
+
             self.current_slide_index = 0
 
             # Update UI
