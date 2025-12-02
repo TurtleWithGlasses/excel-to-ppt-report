@@ -1535,8 +1535,8 @@ class TemplateBuilder(QMainWindow):
             # Check if this is the title slide (first slide)
             if self.current_slide_index == 0:
                 self._render_title_slide_preview()
-            # Check if this is a table slide OR if user has table slide settings configured
-            elif self._is_table_slide(slide) or (self.current_slide_index > 0 and self._has_table_slide_settings()):
+            # Check if this is a table slide OR if user has table slide settings configured OR if editing Table component
+            elif self._is_table_slide(slide) or (self.current_slide_index > 0 and self._has_table_slide_settings()) or self.selected_component_type == "Table":
                 self._render_table_slide_preview(slide)
             # Check if this is a chart slide OR if user has chart settings configured
             elif self._is_chart_slide(slide) or (self.current_slide_index > 0 and self._has_chart_settings()):
@@ -1899,9 +1899,13 @@ class TemplateBuilder(QMainWindow):
         table_y = 1.5 * INCH_TO_PIXEL
         table_x = 0.5 * INCH_TO_PIXEL
         table_width = 9.0 * INCH_TO_PIXEL
-        num_cols = min(len(selected_columns), 7)  # Limit to 7 columns for preview
+        num_cols = len(selected_columns)  # Show all selected columns
         col_width = table_width / num_cols if num_cols > 0 else 1.2 * INCH_TO_PIXEL
         row_height = 0.4 * INCH_TO_PIXEL
+
+        # Adjust font size for many columns to fit better
+        if num_cols > 7:
+            font_size = max(7, font_size - 2)  # Reduce font size for many columns
         
         # Header row background
         self.preview_scene.addRect(
@@ -1912,7 +1916,7 @@ class TemplateBuilder(QMainWindow):
         
         # Column headers with borders
         header_font = QFont(font_name, font_size, QFont.Weight.Bold)
-        for i, col in enumerate(selected_columns[:num_cols]):
+        for i, col in enumerate(selected_columns):
             col_x = table_x + i * col_width
             # Cell border
             self.preview_scene.addRect(
@@ -1920,12 +1924,22 @@ class TemplateBuilder(QMainWindow):
                 col_width, row_height,
                 QColor("#E5E7EB"), QColor("#E5E7EB")
             )
-            # Header text
-            header_item = self.preview_scene.addText(col, header_font)
+            # Header text - truncate if too long for cell
+            header_text = col
+            if num_cols > 7:
+                # Truncate long column names when many columns
+                max_chars = max(6, int(60 / num_cols))
+                if len(col) > max_chars:
+                    header_text = col[:max_chars-2] + ".."
+
+            header_item = self.preview_scene.addText(header_text, header_font)
             header_item.setDefaultTextColor(header_text_color)
             header_rect = header_item.boundingRect()
+            # Clip text to fit in cell
+            if header_rect.width() > col_width - 4:
+                header_item.setTextWidth(col_width - 4)
             header_item.setPos(
-                col_x + (col_width - header_rect.width()) / 2,
+                col_x + (col_width - min(header_rect.width(), col_width - 4)) / 2,
                 table_y + (row_height - header_rect.height()) / 2
             )
 
@@ -2006,12 +2020,19 @@ class TemplateBuilder(QMainWindow):
 
     def on_table_slide_changed(self):
         """Handle table slide input changes - update preview if on table slide"""
-        # Check if current slide is a table slide (has table component)
+        # Update preview if:
+        # 1. We're on a table slide (has table component)
+        # 2. User has table slide settings configured
+        # 3. User is currently editing the Table component
         if self.current_slide_index >= 0:
             slide = self.template_data['slides'][self.current_slide_index]
             components = slide.get('components', [])
             has_table = any(comp.get('type') == 'table' for comp in components)
-            if has_table:
+            has_table_settings = self._has_table_slide_settings()
+            is_editing_table = self.selected_component_type == "Table"
+            
+            # Update preview if any condition is true
+            if has_table or has_table_settings or is_editing_table:
                 self.update_preview()
 
     def previous_slide_preview(self):
