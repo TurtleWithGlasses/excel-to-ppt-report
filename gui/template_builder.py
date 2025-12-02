@@ -2119,6 +2119,9 @@ class TemplateBuilder(QMainWindow):
 
     def on_table_slide_changed(self):
         """Handle table slide input changes - update preview if on table slide"""
+        # Save current table styling settings to template_data
+        self._save_table_styling_to_template()
+
         # Update preview if:
         # 1. We're on a table slide (has table component)
         # 2. User has table slide settings configured
@@ -2129,10 +2132,58 @@ class TemplateBuilder(QMainWindow):
             has_table = any(comp.get('type') == 'table' for comp in components)
             has_table_settings = self._has_table_slide_settings()
             is_editing_table = self.selected_component_type == "Table"
-            
+
             # Update preview if any condition is true
             if has_table or has_table_settings or is_editing_table:
                 self.update_preview()
+
+    def _save_table_styling_to_template(self):
+        """Save current table styling settings to template_data"""
+        if not hasattr(self, 'table_font_combo'):
+            return  # Widgets not initialized yet
+
+        try:
+            # Ensure table_slide structure exists
+            if 'table_slide' not in self.template_data:
+                self.template_data['table_slide'] = {}
+            if 'style' not in self.template_data['table_slide']:
+                self.template_data['table_slide']['style'] = {}
+
+            style = self.template_data['table_slide']['style']
+
+            # Save font settings
+            style['font_name'] = self.table_font_combo.currentText()
+            style['font_size'] = self.table_font_size_spin.value()
+
+            # Save color settings (already saved by pick_table_color, but ensure they exist)
+            if hasattr(self, 'table_header_color_label'):
+                style['header_color'] = self.table_header_color_label.text()
+            if hasattr(self, 'table_row1_color_label'):
+                style['row_color_1'] = self.table_row1_color_label.text()
+            if hasattr(self, 'table_row2_color_label'):
+                style['row_color_2'] = self.table_row2_color_label.text()
+            if hasattr(self, 'table_bg_color_label'):
+                style['background_color'] = self.table_bg_color_label.text()
+
+            # Save alignment settings
+            if hasattr(self, 'table_header_align_combo'):
+                style['header_alignment'] = self.table_header_align_combo.currentText()
+            if hasattr(self, 'table_text_align_combo'):
+                style['text_alignment'] = self.table_text_align_combo.currentText()
+
+            # Save text style settings
+            if hasattr(self, 'table_header_bold_check'):
+                style['header_bold'] = self.table_header_bold_check.isChecked()
+            if hasattr(self, 'table_header_italic_check'):
+                style['header_italic'] = self.table_header_italic_check.isChecked()
+            if hasattr(self, 'table_text_bold_check'):
+                style['text_bold'] = self.table_text_bold_check.isChecked()
+            if hasattr(self, 'table_text_italic_check'):
+                style['text_italic'] = self.table_text_italic_check.isChecked()
+
+        except (RuntimeError, AttributeError):
+            # Widgets might have been deleted
+            pass
 
     def previous_slide_preview(self):
         """Navigate to previous slide"""
