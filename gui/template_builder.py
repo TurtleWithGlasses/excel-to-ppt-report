@@ -881,6 +881,13 @@ class TemplateBuilder(QMainWindow):
         existing_header_color = style_settings.get('header_color', '#2563EB')
         existing_row1_color = style_settings.get('row_color_1', '#FFFFFF')
         existing_row2_color = style_settings.get('row_color_2', '#F9FAFB')
+        existing_bg_color = style_settings.get('background_color', '#FFFFFF')
+        existing_header_align = style_settings.get('header_alignment', 'Center')
+        existing_text_align = style_settings.get('text_alignment', 'Left')
+        existing_header_bold = style_settings.get('header_bold', True)
+        existing_header_italic = style_settings.get('header_italic', False)
+        existing_text_bold = style_settings.get('text_bold', False)
+        existing_text_italic = style_settings.get('text_italic', False)
         
         # Always create new widgets to avoid deleted widget issues
         self._initialize_table_inputs()
@@ -927,6 +934,22 @@ class TemplateBuilder(QMainWindow):
         self.table_row1_color_label.setText(existing_row1_color)
         self.table_row2_color_btn.setStyleSheet(f"background-color: {existing_row2_color}; border: 1px solid #E5E7EB;")
         self.table_row2_color_label.setText(existing_row2_color)
+        self.table_bg_color_btn.setStyleSheet(f"background-color: {existing_bg_color}; border: 1px solid #E5E7EB;")
+        self.table_bg_color_label.setText(existing_bg_color)
+
+        # Set alignments
+        header_align_index = self.table_header_align_combo.findText(existing_header_align)
+        if header_align_index >= 0:
+            self.table_header_align_combo.setCurrentIndex(header_align_index)
+        text_align_index = self.table_text_align_combo.findText(existing_text_align)
+        if text_align_index >= 0:
+            self.table_text_align_combo.setCurrentIndex(text_align_index)
+
+        # Set text styles
+        self.table_header_bold_check.setChecked(existing_header_bold)
+        self.table_header_italic_check.setChecked(existing_header_italic)
+        self.table_text_bold_check.setChecked(existing_text_bold)
+        self.table_text_italic_check.setChecked(existing_text_italic)
         
         form_layout = QFormLayout()
         form_layout.setSpacing(10)
@@ -967,7 +990,24 @@ class TemplateBuilder(QMainWindow):
         row2_color_layout.addWidget(self.table_row2_color_btn)
         row2_color_layout.addWidget(self.table_row2_color_label)
         form_layout.addRow("Row Color 2:", row2_color_layout)
-        
+
+        bg_color_layout = QHBoxLayout()
+        bg_color_layout.addWidget(self.table_bg_color_btn)
+        bg_color_layout.addWidget(self.table_bg_color_label)
+        form_layout.addRow("Background Color:", bg_color_layout)
+
+        # Alignment section
+        form_layout.addRow("Header Alignment:", self.table_header_align_combo)
+        form_layout.addRow("Text Alignment:", self.table_text_align_combo)
+
+        # Text style section
+        style_checkboxes_layout = QVBoxLayout()
+        style_checkboxes_layout.addWidget(self.table_header_bold_check)
+        style_checkboxes_layout.addWidget(self.table_header_italic_check)
+        style_checkboxes_layout.addWidget(self.table_text_bold_check)
+        style_checkboxes_layout.addWidget(self.table_text_italic_check)
+        form_layout.addRow("Text Style:", style_checkboxes_layout)
+
         form_widget = QWidget()
         form_widget.setLayout(form_layout)
         self.config_layout.addWidget(form_widget)
@@ -1040,6 +1080,42 @@ class TemplateBuilder(QMainWindow):
         self.table_row2_color_btn.setStyleSheet("background-color: #F9FAFB; border: 1px solid #E5E7EB;")
         self.table_row2_color_btn.clicked.connect(lambda: self.pick_table_color('row2'))
         self.table_row2_color_label = QLabel("#F9FAFB")
+
+        # Background color
+        self.table_bg_color_btn = QPushButton()
+        self.table_bg_color_btn.setFixedSize(40, 30)
+        self.table_bg_color_btn.setStyleSheet("background-color: #FFFFFF; border: 1px solid #E5E7EB;")
+        self.table_bg_color_btn.clicked.connect(lambda: self.pick_table_color('background'))
+        self.table_bg_color_label = QLabel("#FFFFFF")
+
+        # Text alignment
+        self.table_text_align_combo = QComboBox()
+        self.table_text_align_combo.addItems(['Left', 'Center', 'Right'])
+        self.table_text_align_combo.setCurrentText('Left')
+        self.table_text_align_combo.currentTextChanged.connect(self.on_table_slide_changed)
+
+        # Header alignment
+        self.table_header_align_combo = QComboBox()
+        self.table_header_align_combo.addItems(['Left', 'Center', 'Right'])
+        self.table_header_align_combo.setCurrentText('Center')
+        self.table_header_align_combo.currentTextChanged.connect(self.on_table_slide_changed)
+
+        # Text style checkboxes
+        self.table_header_bold_check = QCheckBox("Bold Headers")
+        self.table_header_bold_check.setChecked(True)
+        self.table_header_bold_check.stateChanged.connect(self.on_table_slide_changed)
+
+        self.table_header_italic_check = QCheckBox("Italic Headers")
+        self.table_header_italic_check.setChecked(False)
+        self.table_header_italic_check.stateChanged.connect(self.on_table_slide_changed)
+
+        self.table_text_bold_check = QCheckBox("Bold Text")
+        self.table_text_bold_check.setChecked(False)
+        self.table_text_bold_check.stateChanged.connect(self.on_table_slide_changed)
+
+        self.table_text_italic_check = QCheckBox("Italic Text")
+        self.table_text_italic_check.setChecked(False)
+        self.table_text_italic_check.stateChanged.connect(self.on_table_slide_changed)
 
     def _show_chart_editor(self):
         """Show chart editing panel"""
@@ -1356,7 +1432,8 @@ class TemplateBuilder(QMainWindow):
         color_map = {
             'header': ('header_color', '#2563EB'),
             'row1': ('row_color_1', '#FFFFFF'),
-            'row2': ('row_color_2', '#F9FAFB')
+            'row2': ('row_color_2', '#F9FAFB'),
+            'background': ('background_color', '#FFFFFF')
         }
         
         style_key, default_color = color_map.get(color_type, ('header_color', '#2563EB'))
@@ -1385,6 +1462,9 @@ class TemplateBuilder(QMainWindow):
             elif color_type == 'row2':
                 self.table_row2_color_btn.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #E5E7EB;")
                 self.table_row2_color_label.setText(hex_color)
+            elif color_type == 'background':
+                self.table_bg_color_btn.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #E5E7EB;")
+                self.table_bg_color_label.setText(hex_color)
             
             # Update preview
             self.on_table_slide_changed()
@@ -1861,6 +1941,15 @@ class TemplateBuilder(QMainWindow):
         row_color_1 = QColor(table_style.get('row_color_1', '#FFFFFF'))
         row_color_2 = QColor(table_style.get('row_color_2', '#F9FAFB'))
         text_color = QColor(table_style.get('text_color', '#1F2937'))
+        bg_color = QColor(table_style.get('background_color', '#FFFFFF'))
+
+        # Get text style settings
+        header_bold = table_style.get('header_bold', True)
+        header_italic = table_style.get('header_italic', False)
+        text_bold = table_style.get('text_bold', False)
+        text_italic = table_style.get('text_italic', False)
+        header_alignment = table_style.get('header_alignment', 'Center')
+        text_alignment = table_style.get('text_alignment', 'Left')
 
         # Get selected columns
         selected_columns = []
@@ -1906,7 +1995,15 @@ class TemplateBuilder(QMainWindow):
         # Adjust font size for many columns to fit better
         if num_cols > 7:
             font_size = max(7, font_size - 2)  # Reduce font size for many columns
-        
+
+        # Table background (behind entire table)
+        total_height = row_height * 6  # 1 header + 5 data rows
+        self.preview_scene.addRect(
+            table_x, table_y,
+            table_width, total_height,
+            bg_color, bg_color
+        )
+
         # Header row background
         self.preview_scene.addRect(
             table_x, table_y,
@@ -1915,7 +2012,8 @@ class TemplateBuilder(QMainWindow):
         )
         
         # Column headers with borders
-        header_font = QFont(font_name, font_size, QFont.Weight.Bold)
+        header_font = QFont(font_name, font_size, QFont.Weight.Bold if header_bold else QFont.Weight.Normal)
+        header_font.setItalic(header_italic)
         for i, col in enumerate(selected_columns):
             col_x = table_x + i * col_width
             # Cell border
@@ -1945,7 +2043,8 @@ class TemplateBuilder(QMainWindow):
 
         # Data rows (always show at least 5 empty rows)
         sample_rows = 5
-        cell_font = QFont(font_name, font_size)
+        cell_font = QFont(font_name, font_size, QFont.Weight.Bold if text_bold else QFont.Weight.Normal)
+        cell_font.setItalic(text_italic)
         for row_idx in range(sample_rows):
             row_y = table_y + row_height + row_idx * row_height
             # Alternate row colors
