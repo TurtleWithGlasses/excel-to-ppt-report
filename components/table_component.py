@@ -21,7 +21,7 @@ class TableComponent(BaseComponent):
     Supports pandas DataFrames, lists of dicts, and structured data.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], template: Optional[Dict[str, Any]] = None):
         """
         Initialize TableComponent.
 
@@ -41,9 +41,20 @@ class TableComponent(BaseComponent):
                 - row_color_1: First row color
                 - row_color_2: Second row color (for zebra)
                 - text_color: Table text color
+                - background_color: Background color for table (optional)
                 - font_size: Table font size
         """
-        super().__init__(config)
+        super().__init__(config, template)
+
+        # Merge template table_slide style settings with component style
+        # Template settings act as defaults, component-specific settings override
+        if template and 'settings' in template:
+            table_slide_settings = template['settings'].get('table_slide', {})
+            table_slide_style = table_slide_settings.get('style', {})
+
+            # Merge: template defaults + component overrides
+            merged_style = {**table_slide_style, **self.style}
+            self.style = merged_style
 
         # Table-specific config
         self.show_header = self.style.get('header_row', True)
@@ -84,6 +95,17 @@ class TableComponent(BaseComponent):
             # Add placeholder text if no data
             self._render_empty_table(slide)
             return
+
+        # Add background rectangle if background_color is specified
+        if 'background_color' in self.style:
+            r, g, b = self.get_color('background_color', '#FFFFFF')
+            bg_shape = slide.shapes.add_shape(
+                1,  # Rectangle shape type
+                self.x, self.y, self.width, self.height
+            )
+            bg_shape.fill.solid()
+            bg_shape.fill.fore_color.rgb = RGBColor(r, g, b)
+            bg_shape.line.fill.background()  # No border
 
         # Create table shape
         rows = len(df) + (1 if self.show_header else 0)
