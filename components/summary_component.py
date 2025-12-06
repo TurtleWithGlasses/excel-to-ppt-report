@@ -388,12 +388,23 @@ class SummaryComponent(BaseComponent):
                 box_height
             )
 
-            # Box styling
-            r, g, b = self.get_color('highlight_color', '#EFF6FF')
+            # Box styling - use template colors if available
+            template_colors = self.get_template_colors()
+            default_highlight_bg = '#EFF6FF'
+            default_highlight_border = '#2563EB'
+            
+            if template_colors:
+                # Use primary color for border, light version for background
+                if 'primary' in template_colors:
+                    default_highlight_border = template_colors['primary']
+                    # Create light version of primary color (add transparency effect via lighter shade)
+                    default_highlight_bg = self._lighten_color(template_colors['primary'])
+            
+            r, g, b = self.get_color('highlight_color', default_highlight_bg)
             box.fill.solid()
             box.fill.fore_color.rgb = RGBColor(r, g, b)
 
-            r, g, b = self.get_color('highlight_color', '#2563EB')
+            r, g, b = self.get_color('highlight_color', default_highlight_border)
             box.line.color.rgb = RGBColor(r, g, b)
             box.line.width = Pt(2)
 
@@ -408,6 +419,31 @@ class SummaryComponent(BaseComponent):
             text_frame.vertical_anchor = 1  # Middle
             text_frame.margin_left = Inches(0.1)
             text_frame.margin_right = Inches(0.1)
+
+    def _lighten_color(self, hex_color: str) -> str:
+        """
+        Create a lighter version of a hex color for backgrounds.
+
+        Args:
+            hex_color: Hex color string (e.g., '#2563EB')
+
+        Returns:
+            Lighter hex color string
+        """
+        try:
+            hex_color = hex_color.lstrip('#')
+            r = int(hex_color[0:2], 16)
+            g = int(hex_color[2:4], 16)
+            b = int(hex_color[4:6], 16)
+            
+            # Lighten by mixing with white (80% white, 20% original)
+            r = int(r * 0.2 + 255 * 0.8)
+            g = int(g * 0.2 + 255 * 0.8)
+            b = int(b * 0.2 + 255 * 0.8)
+            
+            return f"#{r:02X}{g:02X}{b:02X}"
+        except (ValueError, IndexError):
+            return '#EFF6FF'  # Default light blue
 
     def _render_placeholder(self, slide: Slide) -> None:
         """Render placeholder when no insights available."""

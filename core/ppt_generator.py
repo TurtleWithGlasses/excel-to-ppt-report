@@ -232,13 +232,31 @@ class PPTGenerator:
             component_config: Component configuration
         """
         try:
-            # Create component
-            component = self.component_factory.create_component(component_config)
+            # Get current template for brand colors
+            template = self.template_manager.current_template
 
+            # Create component with template reference
+            component = self.component_factory.create_component(
+                component_config,
+                template=template
+            )
+
+            # Prepare variables including template title_slide settings
+            variables = self.custom_variables.copy()
+            
+            # Add title_slide settings from template if available
+            if template and 'settings' in template:
+                title_slide = template['settings'].get('title_slide', {})
+                if title_slide:
+                    # Add title_slide variables for text substitution
+                    variables['title_slide_title'] = title_slide.get('title', '')
+                    variables['title_slide_subtitle'] = title_slide.get('subtitle', '')
+                    variables['title_slide_description'] = title_slide.get('description', '')
+            
             # Get data for component
             component_data = self.data_mapper.get_data_for_component(
                 component_config,
-                self.custom_variables
+                variables
             )
 
             # Render component

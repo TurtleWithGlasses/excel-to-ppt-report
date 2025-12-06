@@ -188,8 +188,13 @@ class TableComponent(BaseComponent):
             font.size = self.get_font_size(default=11)
             font.bold = True
 
-            # Header colors
-            r, g, b = self.get_color('header_color', '#2563EB')
+            # Header colors - use template primary color if available
+            default_header_color = '#2563EB'
+            template_colors = self.get_template_colors()
+            if template_colors and 'primary' in template_colors:
+                default_header_color = template_colors['primary']
+            
+            r, g, b = self.get_color('header_color', default_header_color)
             cell.fill.solid()
             cell.fill.fore_color.rgb = RGBColor(r, g, b)
 

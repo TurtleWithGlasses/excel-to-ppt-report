@@ -1,0 +1,216 @@
+{
+  "metadata": {
+    "name": "örnek",
+    "description": "Fashion & Retail report template",
+    "industry": "Fashion & Retail",
+    "author": "ReportForge Template Builder",
+    "version": "1.0",
+    "created_date": "2025-12-06",
+    "modified_date": "2025-12-06"
+  },
+  "settings": {
+    "page_size": "16:9",
+    "default_font": "Segoe UI",
+    "default_font_size": 11,
+    "logo_path": "C:/Users/mhmts/Downloads/homepage icon.png",
+    "embedded_logo_path": "C:/Users/mhmts/Downloads/homepage icon.png",
+    "title_slide": {
+      "title": "Örnek",
+      "subtitle": "Örnek",
+      "description": "Örnek Örnek",
+      "logo_position": {
+        "x": 5.0,
+        "y": 1.0
+      },
+      "logo_size": {
+        "width": 2.0,
+        "height": 1.5
+      },
+      "title_position": {
+        "x": 0.5,
+        "y": 2.5
+      },
+      "embedded_logo_position": {
+        "x": 0.5,
+        "y": 6.5
+      },
+      "embedded_logo_size": {
+        "width": 1.5,
+        "height": 0.5
+      }
+    },
+    "table_slide": {
+      "title": "Örnek",
+      "subtitle": "",
+      "columns": [
+        "Firma",
+        "Kurum",
+        "Toplam",
+        "Pozitif",
+        "Negatif",
+        "Erişim",
+        "StxCm",
+        "Reklam Eşdeğeri",
+        "Net Etki",
+        "Medya Kapsam"
+      ],
+      "sort_by": null,
+      "ascending": false,
+      "group_by": null,
+      "note": "",
+      "style": {
+        "font_name": "Calibri",
+        "font_size": 11,
+        "header_color": "#AA007F",
+        "header_text_color": "#AA557F",
+        "row_color_1": "#000000",
+        "row_color_2": "#000000",
+        "text_color": "#55AA00",
+        "background_color": "#5555FF",
+        "header_alignment": "Center",
+        "text_alignment": "Center",
+        "header_bold": true,
+        "header_italic": false,
+        "text_bold": true,
+        "text_italic": false
+      }
+    },
+    "chart_slide": {
+      "chart_type": "column",
+      "title": "",
+      "x_column": "Firma",
+      "y_column": "Net Etki",
+      "calculation": "sum",
+      "sort_by": null,
+      "ascending": false,
+      "top_n": null,
+      "style": {
+        "colors": [
+          "#2563EB",
+          "#10B981",
+          "#F59E0B",
+          "#EF4444",
+          "#8B5CF6"
+        ],
+        "show_values": true,
+        "grid": true,
+        "legend_position": "none"
+      }
+    },
+    "color_scheme": {
+      "primary": "#2563EB",
+      "secondary": "#10B981",
+      "accent": "#F59E0B",
+      "negative": "#EF4444",
+      "neutral": "#6B7280",
+      "text": "#1F2937",
+      "background": "#FFFFFF"
+    }
+  },
+  "slides": [
+    {
+      "name": "başlık",
+      "type": "Title Slide",
+      "components": [],
+      "slide_settings": {
+        "title": {
+          "title": "Örnek",
+          "subtitle": "Örnek",
+          "description": "Örnek Örnek",
+          "logo_position": {
+            "x": 5.0,
+            "y": 1.0
+          },
+          "logo_size": {
+            "width": 2.0,
+            "height": 1.5
+          },
+          "title_position": {
+            "x": 0.5,
+            "y": 2.5
+          },
+          "embedded_logo_position": {
+            "x": 0.5,
+            "y": 6.5
+          },
+          "embedded_logo_size": {
+            "width": 1.5,
+            "height": 0.5
+          }
+        }
+      }
+    },
+    {
+      "name": "tablo",
+      "type": "Table Slide",
+      "components": [],
+      "slide_settings": {
+        "table": {
+          "title": "Örnek",
+          "subtitle": "",
+          "columns": [
+            "Firma",
+            "Kurum",
+            "Toplam",
+            "Pozitif",
+            "Negatif",
+            "Erişim",
+            "StxCm",
+            "Reklam Eşdeğeri",
+            "Net Etki",
+            "Medya Kapsam"
+          ],
+          "sort_by": null,
+          "ascending": false,
+          "group_by": null,
+          "note": "",
+          "style": {
+            "font_name": "Calibri",
+            "font_size": 11,
+            "header_color": "#AA007F",
+            "header_text_color": "#AA557F",
+            "row_color_1": "#000000",
+            "row_color_2": "#000000",
+            "text_color": "#55AA00",
+            "background_color": "#5555FF",
+            "header_alignment": "Center",
+            "text_alignment": "Center",
+            "header_bold": true,
+            "header_italic": false,
+            "text_bold": true,
+            "text_italic": false
+          }
+        }
+      }
+    },
+    {
+      "name": "grafik",
+      "type": "Chart Slide",
+      "components": [],
+      "slide_settings": {
+        "chart": {
+          "chart_type": "column",
+          "title": "",
+          "x_column": "Firma",
+          "y_column": "Net Etki",
+          "calculation": "sum",
+          "sort_by": null,
+          "ascending": false,
+          "top_n": null,
+          "style": {
+            "colors": [
+              "#2563EB",
+              "#10B981",
+              "#F59E0B",
+              "#EF4444",
+              "#8B5CF6"
+            ],
+            "show_values": true,
+            "grid": true,
+            "legend_position": "none"
+          }
+        }
+      }
+    }
+  ]
+}

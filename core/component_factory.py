@@ -38,13 +38,14 @@ class ComponentFactory:
     }
 
     @classmethod
-    def create_component(cls, config: Dict[str, Any]) -> BaseComponent:
+    def create_component(cls, config: Dict[str, Any], template: Optional[Dict[str, Any]] = None) -> BaseComponent:
         """
         Create a component instance from configuration.
 
         Args:
             config: Component configuration dictionary
                 Must include 'type' key with valid component type
+            template: Optional template dictionary (for brand colors and settings)
 
         Returns:
             Component instance (subclass of BaseComponent)
@@ -61,7 +62,7 @@ class ComponentFactory:
                 'size': {'width': 9.0, 'height': 1.0},
                 'style': {'font_size': 24, 'bold': True}
             }
-            component = ComponentFactory.create_component(config)
+            component = ComponentFactory.create_component(config, template=template_dict)
         """
         if not isinstance(config, dict):
             raise ValueError("Configuration must be a dictionary")
@@ -81,7 +82,7 @@ class ComponentFactory:
             )
 
         try:
-            component = component_class(config)
+            component = component_class(config, template=template)
             return component
         except Exception as e:
             raise Exception(
@@ -89,12 +90,13 @@ class ComponentFactory:
             ) from e
 
     @classmethod
-    def create_components(cls, configs: List[Dict[str, Any]]) -> List[BaseComponent]:
+    def create_components(cls, configs: List[Dict[str, Any]], template: Optional[Dict[str, Any]] = None) -> List[BaseComponent]:
         """
         Create multiple components from a list of configurations.
 
         Args:
             configs: List of component configuration dictionaries
+            template: Optional template dictionary (for brand colors and settings)
 
         Returns:
             List of component instances
@@ -109,7 +111,7 @@ class ComponentFactory:
                 {'type': 'table', 'data_source': {...}, ...},
                 {'type': 'chart', 'chart_type': 'column', ...}
             ]
-            components = ComponentFactory.create_components(configs)
+            components = ComponentFactory.create_components(configs, template=template_dict)
         """
         if not isinstance(configs, list):
             raise ValueError("Configurations must be a list")
@@ -118,7 +120,7 @@ class ComponentFactory:
 
         for idx, config in enumerate(configs):
             try:
-                component = cls.create_component(config)
+                component = cls.create_component(config, template=template)
                 components.append(component)
             except Exception as e:
                 raise Exception(
@@ -128,12 +130,13 @@ class ComponentFactory:
         return components
 
     @classmethod
-    def validate_config(cls, config: Dict[str, Any]) -> bool:
+    def validate_config(cls, config: Dict[str, Any], template: Optional[Dict[str, Any]] = None) -> bool:
         """
         Validate a component configuration without creating the instance.
 
         Args:
             config: Component configuration dictionary
+            template: Optional template dictionary (for brand colors and settings)
 
         Returns:
             True if configuration is valid
@@ -143,7 +146,7 @@ class ComponentFactory:
 
         Example:
             config = {'type': 'text', 'content': 'Test', ...}
-            is_valid = ComponentFactory.validate_config(config)
+            is_valid = ComponentFactory.validate_config(config, template=template_dict)
         """
         if not isinstance(config, dict):
             raise ValueError("Configuration must be a dictionary")
@@ -163,7 +166,7 @@ class ComponentFactory:
         # Create and validate component
         component_class = cls.COMPONENT_TYPES[component_type]
         try:
-            component = component_class(config)
+            component = component_class(config, template=template)
             component.validate()
             return True
         except Exception as e:

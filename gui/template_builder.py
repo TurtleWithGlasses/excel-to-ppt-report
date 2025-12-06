@@ -860,10 +860,14 @@ class TemplateBuilder(QMainWindow):
 
     def _show_table_editor(self):
         """Show table editing panel"""
+        print(f"[DEBUG] _show_table_editor: Called")
+        import traceback
+        print(f"[DEBUG] _show_table_editor: Call stack:\n{''.join(traceback.format_stack()[-5:-1])}")
+
         title_label = QLabel("Table Configuration")
         title_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         self.config_layout.addWidget(title_label)
-        
+
         # Get existing values from template_data instead of potentially deleted widgets
         table_slide_settings = self.template_data.get('table_slide', {})
         existing_title = table_slide_settings.get('title', '')
@@ -873,6 +877,7 @@ class TemplateBuilder(QMainWindow):
         existing_sort_order = table_slide_settings.get('ascending', False)
         existing_group_by = table_slide_settings.get('group_by', '')
         existing_columns = table_slide_settings.get('columns', [])
+        print(f"[DEBUG] _show_table_editor: existing_columns from template_data: {existing_columns}")
         
         # Get style settings
         style_settings = table_slide_settings.get('style', {})
@@ -882,6 +887,8 @@ class TemplateBuilder(QMainWindow):
         existing_row1_color = style_settings.get('row_color_1', '#FFFFFF')
         existing_row2_color = style_settings.get('row_color_2', '#F9FAFB')
         existing_bg_color = style_settings.get('background_color', '#FFFFFF')
+        existing_header_text_color = style_settings.get('header_text_color', '#FFFFFF')
+        existing_text_color = style_settings.get('text_color', '#1F2937')
         existing_header_align = style_settings.get('header_alignment', 'Center')
         existing_text_align = style_settings.get('text_alignment', 'Left')
         existing_header_bold = style_settings.get('header_bold', True)
@@ -916,10 +923,28 @@ class TemplateBuilder(QMainWindow):
                 self.table_group_by_combo.setCurrentIndex(index)
         
         # Set columns (check items in list)
+        # Temporarily disconnect signal to avoid triggering saves during initialization
+        try:
+            self.table_columns_list.itemChanged.disconnect(self.on_table_slide_changed)
+        except:
+            pass  # Signal might not be connected yet
+        
+        # Ensure existing_columns is a list
+        if not isinstance(existing_columns, list):
+            existing_columns = []
+        
+        # Set checkboxes based on saved columns
         for i in range(self.table_columns_list.count()):
             item = self.table_columns_list.item(i)
-            if item and item.text() in existing_columns:
-                item.setCheckState(Qt.CheckState.Checked)
+            if item:
+                item_text = item.text()
+                if item_text in existing_columns:
+                    item.setCheckState(Qt.CheckState.Checked)
+                else:
+                    item.setCheckState(Qt.CheckState.Unchecked)
+        
+        # Reconnect signal
+        self.table_columns_list.itemChanged.connect(self.on_table_slide_changed)
         
         # Set font
         font_index = self.table_font_combo.findText(existing_font)
@@ -936,6 +961,10 @@ class TemplateBuilder(QMainWindow):
         self.table_row2_color_label.setText(existing_row2_color)
         self.table_bg_color_btn.setStyleSheet(f"background-color: {existing_bg_color}; border: 1px solid #E5E7EB;")
         self.table_bg_color_label.setText(existing_bg_color)
+        self.table_header_text_color_btn.setStyleSheet(f"background-color: {existing_header_text_color}; border: 1px solid #E5E7EB;")
+        self.table_header_text_color_label.setText(existing_header_text_color)
+        self.table_text_color_btn.setStyleSheet(f"background-color: {existing_text_color}; border: 1px solid #E5E7EB;")
+        self.table_text_color_label.setText(existing_text_color)
 
         # Set alignments
         header_align_index = self.table_header_align_combo.findText(existing_header_align)
@@ -995,6 +1024,16 @@ class TemplateBuilder(QMainWindow):
         bg_color_layout.addWidget(self.table_bg_color_btn)
         bg_color_layout.addWidget(self.table_bg_color_label)
         form_layout.addRow("Background Color:", bg_color_layout)
+
+        header_text_color_layout = QHBoxLayout()
+        header_text_color_layout.addWidget(self.table_header_text_color_btn)
+        header_text_color_layout.addWidget(self.table_header_text_color_label)
+        form_layout.addRow("Header Text Color:", header_text_color_layout)
+
+        text_color_layout = QHBoxLayout()
+        text_color_layout.addWidget(self.table_text_color_btn)
+        text_color_layout.addWidget(self.table_text_color_label)
+        form_layout.addRow("Data Text Color:", text_color_layout)
 
         # Alignment section
         form_layout.addRow("Header Alignment:", self.table_header_align_combo)
@@ -1087,6 +1126,20 @@ class TemplateBuilder(QMainWindow):
         self.table_bg_color_btn.setStyleSheet("background-color: #FFFFFF; border: 1px solid #E5E7EB;")
         self.table_bg_color_btn.clicked.connect(lambda: self.pick_table_color('background'))
         self.table_bg_color_label = QLabel("#FFFFFF")
+
+        # Header text color
+        self.table_header_text_color_btn = QPushButton()
+        self.table_header_text_color_btn.setFixedSize(40, 30)
+        self.table_header_text_color_btn.setStyleSheet("background-color: #FFFFFF; border: 1px solid #E5E7EB;")
+        self.table_header_text_color_btn.clicked.connect(lambda: self.pick_table_color('header_text'))
+        self.table_header_text_color_label = QLabel("#FFFFFF")
+
+        # Data text color
+        self.table_text_color_btn = QPushButton()
+        self.table_text_color_btn.setFixedSize(40, 30)
+        self.table_text_color_btn.setStyleSheet("background-color: #1F2937; border: 1px solid #E5E7EB;")
+        self.table_text_color_btn.clicked.connect(lambda: self.pick_table_color('text'))
+        self.table_text_color_label = QLabel("#1F2937")
 
         # Text alignment
         self.table_text_align_combo = QComboBox()
@@ -1323,6 +1376,9 @@ class TemplateBuilder(QMainWindow):
 
     def on_chart_changed(self):
         """Handle chart input changes - update preview if on chart slide"""
+        # Save current chart settings to template_data
+        self._save_chart_settings_to_template()
+        
         if self.current_slide_index >= 0:
             slide = self.template_data['slides'][self.current_slide_index]
             components = slide.get('components', [])
@@ -1433,7 +1489,9 @@ class TemplateBuilder(QMainWindow):
             'header': ('header_color', '#2563EB'),
             'row1': ('row_color_1', '#FFFFFF'),
             'row2': ('row_color_2', '#F9FAFB'),
-            'background': ('background_color', '#FFFFFF')
+            'background': ('background_color', '#FFFFFF'),
+            'header_text': ('header_text_color', '#FFFFFF'),
+            'text': ('text_color', '#1F2937')
         }
         
         style_key, default_color = color_map.get(color_type, ('header_color', '#2563EB'))
@@ -1465,7 +1523,13 @@ class TemplateBuilder(QMainWindow):
             elif color_type == 'background':
                 self.table_bg_color_btn.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #E5E7EB;")
                 self.table_bg_color_label.setText(hex_color)
-            
+            elif color_type == 'header_text':
+                self.table_header_text_color_btn.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #E5E7EB;")
+                self.table_header_text_color_label.setText(hex_color)
+            elif color_type == 'text':
+                self.table_text_color_btn.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #E5E7EB;")
+                self.table_text_color_label.setText(hex_color)
+
             # Update preview
             self.on_table_slide_changed()
 
@@ -1599,7 +1663,28 @@ class TemplateBuilder(QMainWindow):
     def slide_selected(self, index):
         """Handle slide selection"""
         if 0 <= index < len(self.template_data['slides']):
+            # Save current slide's component editor state before switching
+            if self.current_slide_index >= 0 and self.current_slide_index < len(self.template_data['slides']):
+                self._save_current_slide_component_settings()
+
+            # Switch to new slide
             self.current_slide_index = index
+
+            # Load new slide's component type and show appropriate editor
+            new_slide = self.template_data['slides'][index]
+            slide_type = new_slide.get('type', 'Blank Slide')
+
+            # Load slide-specific settings
+            self._load_slide_component_settings(new_slide)
+
+            # Determine component type from slide type and show editor
+            if 'Table' in slide_type:
+                self.show_component_editor('Table')
+            elif 'Chart' in slide_type:
+                self.show_component_editor('Chart')
+            elif slide_type == 'Title Slide':
+                self.show_component_editor('Title Slide')
+
             self.update_preview()
 
     def update_preview(self):
@@ -1951,7 +2036,7 @@ class TemplateBuilder(QMainWindow):
         header_alignment = table_style.get('header_alignment', 'Center')
         text_alignment = table_style.get('text_alignment', 'Left')
 
-        # Get selected columns
+        # Get selected columns - respect user's selection, even if empty
         selected_columns = []
         try:
             if hasattr(self, 'table_columns_list') and self.table_columns_list:
@@ -1962,13 +2047,16 @@ class TemplateBuilder(QMainWindow):
         except RuntimeError:
             pass
         
+        # If no columns selected from widget, check template_data
+        # But ONLY if we couldn't access the widget - don't override empty selections
         if not selected_columns:
-            # Use default from settings
-            selected_columns = table_slide_settings.get('columns', ['Firma', 'Net Etki', 'Erişim', 'Reklam Eşdeğeri'])
-
-        # Always show at least default columns if none selected
-        if not selected_columns:
-            selected_columns = ['Firma', 'Net Etki', 'Erişim', 'Reklam Eşdeğeri']
+            # Only use saved columns if we couldn't read from widget (exception case)
+            # If widget exists and has no checked items, that's intentional - respect it
+            if not (hasattr(self, 'table_columns_list') and self.table_columns_list):
+                selected_columns = table_slide_settings.get('columns', [])
+        
+        # DO NOT add default columns - respect empty selection
+        # If user wants no columns, show no columns in preview
 
         # Render title
         if title:
@@ -1985,6 +2073,15 @@ class TemplateBuilder(QMainWindow):
             subtitle_item.setPos(0.5 * INCH_TO_PIXEL, 1.0 * INCH_TO_PIXEL)
 
         # Render table preview with proper structure
+        # If no columns selected, show empty table or message
+        if not selected_columns:
+            # Show a message that no columns are selected
+            empty_msg_font = QFont("Calibri", 14)
+            empty_msg = self.preview_scene.addText("No columns selected. Please select columns to display.", empty_msg_font)
+            empty_msg.setDefaultTextColor(QColor("#9CA3AF"))
+            empty_msg.setPos(0.5 * INCH_TO_PIXEL, 2.0 * INCH_TO_PIXEL)
+            return  # Don't render table if no columns
+        
         table_y = 1.5 * INCH_TO_PIXEL
         table_x = 0.5 * INCH_TO_PIXEL
         table_width = 9.0 * INCH_TO_PIXEL
@@ -2036,8 +2133,18 @@ class TemplateBuilder(QMainWindow):
             # Clip text to fit in cell
             if header_rect.width() > col_width - 4:
                 header_item.setTextWidth(col_width - 4)
+
+            # Apply header alignment
+            text_width = min(header_rect.width(), col_width - 4)
+            if header_alignment == 'Left':
+                x_offset = 0.05 * INCH_TO_PIXEL
+            elif header_alignment == 'Right':
+                x_offset = col_width - text_width - 0.05 * INCH_TO_PIXEL
+            else:  # Center
+                x_offset = (col_width - text_width) / 2
+
             header_item.setPos(
-                col_x + (col_width - min(header_rect.width(), col_width - 4)) / 2,
+                col_x + x_offset,
                 table_y + (row_height - header_rect.height()) / 2
             )
 
@@ -2074,8 +2181,17 @@ class TemplateBuilder(QMainWindow):
                         cell_item = self.preview_scene.addText(cell_text, cell_font)
                         cell_item.setDefaultTextColor(text_color)
                         cell_rect = cell_item.boundingRect()
+
+                        # Apply text alignment
+                        if text_alignment == 'Left':
+                            x_offset = 0.05 * INCH_TO_PIXEL
+                        elif text_alignment == 'Right':
+                            x_offset = col_width - cell_rect.width() - 0.05 * INCH_TO_PIXEL
+                        else:  # Center
+                            x_offset = (col_width - cell_rect.width()) / 2
+
                         cell_item.setPos(
-                            col_x + 0.05 * INCH_TO_PIXEL,
+                            col_x + x_offset,
                             row_y + (row_height - cell_rect.height()) / 2
                         )
 
@@ -2093,28 +2209,63 @@ class TemplateBuilder(QMainWindow):
 
     def _get_selected_table_columns(self):
         """Get list of selected table columns"""
+        print(f"[DEBUG] _get_selected_table_columns: Called")
+        # First, try to get from template_data if widgets might be deleted
+        if not hasattr(self, 'table_columns_list'):
+            table_columns = self.template_data.get('table_slide', {}).get('columns', [])
+            print(f"[DEBUG] _get_selected_table_columns: No widget, returning from template_data: {table_columns}")
+            # Return exactly what's in template_data, even if empty
+            return table_columns
+
         selected = []
         try:
-            if hasattr(self, 'table_columns_list') and self.table_columns_list:
-                for i in range(self.table_columns_list.count()):
-                    item = self.table_columns_list.item(i)
-                    if item and item.checkState() == Qt.CheckState.Checked:
-                        selected.append(item.text())
-        except RuntimeError:
-            pass
-        return selected if selected else ['Firma', 'Net Etki', 'Erişim', 'Reklam Eşdeğeri']
+            widget = self.table_columns_list
+            # Try to access the widget - if it's deleted, this will raise RuntimeError
+            count = widget.count()
+            print(f"[DEBUG] _get_selected_table_columns: Widget has {count} items")
+            for i in range(count):
+                item = widget.item(i)
+                if item and item.checkState() == Qt.CheckState.Checked:
+                    selected.append(item.text())
+                    print(f"[DEBUG] _get_selected_table_columns: Item {i} '{item.text()}' is CHECKED")
+                elif item:
+                    print(f"[DEBUG] _get_selected_table_columns: Item {i} '{item.text()}' is UNCHECKED")
+        except (RuntimeError, SystemError, AttributeError, Exception) as e:
+            # Widget was deleted or inaccessible, fall back to template_data
+            print(f"[DEBUG] _get_selected_table_columns: Exception accessing widget: {e}")
+            table_columns = self.template_data.get('table_slide', {}).get('columns', [])
+            # Return exactly what's in template_data, even if empty
+            return table_columns
+
+        # Return exactly what user selected, even if empty
+        print(f"[DEBUG] _get_selected_table_columns: Returning: {selected}")
+        return selected
 
     def _get_selected_chart_colors(self):
         """Get list of selected chart colors"""
+        # First, try to get from template_data if widgets might be deleted
+        if not hasattr(self, 'chart_colors_list'):
+            chart_colors = self.template_data.get('chart_slide', {}).get('style', {}).get('colors', [])
+            if chart_colors:
+                return chart_colors
+            return ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
+
         selected = []
         try:
-            if hasattr(self, 'chart_colors_list') and self.chart_colors_list:
-                for i in range(self.chart_colors_list.count()):
-                    item = self.chart_colors_list.item(i)
-                    if item and item.checkState() == Qt.CheckState.Checked:
-                        selected.append(item.text())
-        except RuntimeError:
-            pass
+            widget = self.chart_colors_list
+            # Try to access the widget - if it's deleted, this will raise RuntimeError
+            count = widget.count()
+            for i in range(count):
+                item = widget.item(i)
+                if item and item.checkState() == Qt.CheckState.Checked:
+                    selected.append(item.text())
+        except (RuntimeError, SystemError, AttributeError, Exception):
+            # Widget was deleted or inaccessible, fall back to template_data
+            chart_colors = self.template_data.get('chart_slide', {}).get('style', {}).get('colors', [])
+            if chart_colors:
+                return chart_colors
+
+        # Return selected colors or default
         return selected if selected else ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
 
     def on_table_slide_changed(self):
@@ -2149,7 +2300,44 @@ class TemplateBuilder(QMainWindow):
             if 'style' not in self.template_data['table_slide']:
                 self.template_data['table_slide']['style'] = {}
 
-            style = self.template_data['table_slide']['style']
+            table_slide = self.template_data['table_slide']
+            style = table_slide['style']
+
+            # Save basic settings
+            if hasattr(self, 'table_slide_title_input'):
+                table_slide['title'] = self.table_slide_title_input.text()
+            if hasattr(self, 'table_slide_subtitle_input'):
+                table_slide['subtitle'] = self.table_slide_subtitle_input.text()
+            if hasattr(self, 'table_slide_note_input'):
+                table_slide['note'] = self.table_slide_note_input.text()
+            if hasattr(self, 'table_sort_column_combo'):
+                sort_by = self.table_sort_column_combo.currentText()
+                table_slide['sort_by'] = sort_by if sort_by else None
+            if hasattr(self, 'table_sort_order_combo'):
+                table_slide['ascending'] = self.table_sort_order_combo.currentText() == "Ascending"
+            if hasattr(self, 'table_group_by_combo'):
+                group_by = self.table_group_by_combo.currentText()
+                table_slide['group_by'] = group_by if group_by else None
+            
+            # Save columns - always try to get from widget if it exists
+            if hasattr(self, 'table_columns_list') and self.table_columns_list:
+                try:
+                    selected_cols = self._get_selected_table_columns()
+                    print(f"[DEBUG] _save_table_styling_to_template: Got columns from widget: {selected_cols}")
+                    # Always save whatever user selected, even if empty list
+                    # Use empty list explicitly if None or empty
+                    table_slide['columns'] = selected_cols if selected_cols else []
+                    print(f"[DEBUG] _save_table_styling_to_template: Saved columns to table_slide: {table_slide['columns']}")
+                except (RuntimeError, AttributeError, SystemError) as e:
+                    # Widget was deleted, keep existing columns
+                    print(f"[DEBUG] _save_table_styling_to_template: Widget deleted, keeping existing columns: {e}")
+                    # Only preserve if columns already exist, otherwise set to empty
+                    if 'columns' not in table_slide:
+                        table_slide['columns'] = []
+            else:
+                # Widget doesn't exist - preserve existing columns if set, otherwise use empty list
+                if 'columns' not in table_slide:
+                    table_slide['columns'] = []
 
             # Save font settings
             style['font_name'] = self.table_font_combo.currentText()
@@ -2164,6 +2352,10 @@ class TemplateBuilder(QMainWindow):
                 style['row_color_2'] = self.table_row2_color_label.text()
             if hasattr(self, 'table_bg_color_label'):
                 style['background_color'] = self.table_bg_color_label.text()
+            if hasattr(self, 'table_header_text_color_label'):
+                style['header_text_color'] = self.table_header_text_color_label.text()
+            if hasattr(self, 'table_text_color_label'):
+                style['text_color'] = self.table_text_color_label.text()
 
             # Save alignment settings
             if hasattr(self, 'table_header_align_combo'):
@@ -2181,9 +2373,236 @@ class TemplateBuilder(QMainWindow):
             if hasattr(self, 'table_text_italic_check'):
                 style['text_italic'] = self.table_text_italic_check.isChecked()
 
-        except (RuntimeError, AttributeError):
+        except (RuntimeError, AttributeError, SystemError):
             # Widgets might have been deleted
             pass
+
+    def _save_chart_settings_to_template(self):
+        """Save current chart settings to template_data"""
+        if not hasattr(self, 'chart_type_combo'):
+            return  # Widgets not initialized yet
+
+        try:
+            # Ensure chart_slide structure exists
+            if 'chart_slide' not in self.template_data:
+                self.template_data['chart_slide'] = {}
+            if 'style' not in self.template_data['chart_slide']:
+                self.template_data['chart_slide']['style'] = {}
+
+            chart_slide = self.template_data['chart_slide']
+            style = chart_slide['style']
+
+            # Save basic settings
+            if hasattr(self, 'chart_type_combo'):
+                chart_slide['chart_type'] = self.chart_type_combo.currentText()
+            if hasattr(self, 'chart_title_input'):
+                chart_slide['title'] = self.chart_title_input.text()
+            if hasattr(self, 'chart_x_column_combo'):
+                chart_slide['x_column'] = self.chart_x_column_combo.currentText()
+            if hasattr(self, 'chart_y_column_combo'):
+                chart_slide['y_column'] = self.chart_y_column_combo.currentText()
+            if hasattr(self, 'chart_calculation_combo'):
+                chart_slide['calculation'] = self.chart_calculation_combo.currentText()
+            if hasattr(self, 'chart_sort_column_combo'):
+                sort_by = self.chart_sort_column_combo.currentText()
+                chart_slide['sort_by'] = sort_by if sort_by else None
+            if hasattr(self, 'chart_sort_order_combo'):
+                chart_slide['ascending'] = self.chart_sort_order_combo.currentText() == "Ascending"
+            if hasattr(self, 'chart_top_n_spin'):
+                top_n = self.chart_top_n_spin.value()
+                chart_slide['top_n'] = top_n if top_n > 0 else None
+
+            # Save style settings
+            style['colors'] = self._get_selected_chart_colors()
+            if hasattr(self, 'chart_show_values_check'):
+                style['show_values'] = self.chart_show_values_check.isChecked()
+            if hasattr(self, 'chart_show_grid_check'):
+                style['grid'] = self.chart_show_grid_check.isChecked()
+            if hasattr(self, 'chart_legend_combo'):
+                style['legend_position'] = self.chart_legend_combo.currentText()
+
+        except (RuntimeError, AttributeError, SystemError):
+            # Widgets might have been deleted
+            pass
+
+    def _get_table_slide_data(self):
+        """Get table slide data from template_data, with widget fallback"""
+        print(f"[DEBUG] _get_table_slide_data: Called")
+        # First try to get from template_data (most reliable)
+        table_slide = self.template_data.get('table_slide', {})
+        print(f"[DEBUG] _get_table_slide_data: table_slide from template_data: {table_slide.get('columns', 'NOT SET')}")
+
+        # Get columns - prioritize template_data, then try widget
+        saved_columns = table_slide.get('columns', [])
+        print(f"[DEBUG] _get_table_slide_data: saved_columns: {saved_columns}")
+        if isinstance(saved_columns, list):
+            # Use saved columns regardless of whether it's empty or not
+            columns = saved_columns
+            print(f"[DEBUG] _get_table_slide_data: Using saved_columns: {columns}")
+        else:
+            # Try to get from widget as fallback (only if saved_columns is not a list)
+            print(f"[DEBUG] _get_table_slide_data: saved_columns not a list, trying widget fallback")
+            try:
+                columns = self._get_selected_table_columns()
+                print(f"[DEBUG] _get_table_slide_data: Using widget_columns: {columns}")
+            except Exception as e:
+                print(f"[DEBUG] _get_table_slide_data: Exception getting widget columns: {e}")
+                columns = []
+                print(f"[DEBUG] _get_table_slide_data: Using empty list (exception): {columns}")
+
+        # Build the data structure, using template_data values first
+        result = {
+            "title": table_slide.get('title', ''),
+            "subtitle": table_slide.get('subtitle', ''),
+            "columns": columns,
+            "sort_by": table_slide.get('sort_by'),
+            "ascending": table_slide.get('ascending', False),
+            "group_by": table_slide.get('group_by'),
+            "note": table_slide.get('note', ''),
+            "style": table_slide.get('style', {})
+        }
+        
+        # Fill in style defaults if missing
+        style = result['style']
+        if not style:
+            style = {}
+        style.setdefault('font_name', 'Calibri')
+        style.setdefault('font_size', 11)
+        style.setdefault('header_color', '#2563EB')
+        style.setdefault('header_text_color', '#FFFFFF')
+        style.setdefault('row_color_1', '#FFFFFF')
+        style.setdefault('row_color_2', '#F9FAFB')
+        style.setdefault('text_color', '#1F2937')
+        style.setdefault('background_color', '#FFFFFF')
+        style.setdefault('header_alignment', 'Center')
+        style.setdefault('text_alignment', 'Left')
+        style.setdefault('header_bold', True)
+        style.setdefault('header_italic', False)
+        style.setdefault('text_bold', False)
+        style.setdefault('text_italic', False)
+        
+        return result
+
+    def _get_chart_slide_data(self):
+        """Get chart slide data from template_data, with widget fallback"""
+        # First try to get from template_data (most reliable)
+        chart_slide = self.template_data.get('chart_slide', {})
+        
+        # Build the data structure, using template_data values first
+        result = {
+            "chart_type": chart_slide.get('chart_type', 'column'),
+            "title": chart_slide.get('title', ''),
+            "x_column": chart_slide.get('x_column', 'Firma'),
+            "y_column": chart_slide.get('y_column', 'Net Etki'),
+            "calculation": chart_slide.get('calculation', 'sum'),
+            "sort_by": chart_slide.get('sort_by'),
+            "ascending": chart_slide.get('ascending', False),
+            "top_n": chart_slide.get('top_n'),
+            "style": chart_slide.get('style', {})
+        }
+        
+        # Fill in style defaults if missing
+        style = result['style']
+        if not style:
+            style = {}
+        style.setdefault('colors', self._get_selected_chart_colors())
+        style.setdefault('show_values', True)
+        style.setdefault('grid', True)
+        style.setdefault('legend_position', 'none')
+        
+        return result
+
+    def _save_current_slide_component_settings(self):
+        """Save current component editor settings to the specific slide before switching"""
+        if self.current_slide_index < 0 or self.current_slide_index >= len(self.template_data['slides']):
+            return
+
+        current_slide = self.template_data['slides'][self.current_slide_index]
+        slide_type = current_slide.get('type', '')
+
+        # Save settings based on the component type being edited
+        if self.selected_component_type == 'Table' or 'Table' in slide_type:
+            self._save_table_styling_to_template()
+            # Also save to slide-specific storage
+            if 'slide_settings' not in current_slide:
+                current_slide['slide_settings'] = {}
+            current_slide['slide_settings']['table'] = self.template_data.get('table_slide', {}).copy()
+
+        elif self.selected_component_type == 'Chart' or 'Chart' in slide_type:
+            self._save_chart_settings_to_template()
+            # Also save to slide-specific storage
+            if 'slide_settings' not in current_slide:
+                current_slide['slide_settings'] = {}
+            current_slide['slide_settings']['chart'] = self.template_data.get('chart_slide', {}).copy()
+
+        elif self.selected_component_type == 'Title Slide' or slide_type == 'Title Slide':
+            # Save title slide settings
+            if 'slide_settings' not in current_slide:
+                current_slide['slide_settings'] = {}
+            current_slide['slide_settings']['title'] = self.template_data.get('title_slide', {}).copy()
+
+    def _load_slide_component_settings(self, slide):
+        """Load slide-specific component settings into template_data and UI"""
+        slide_type = slide.get('type', '')
+        slide_settings = slide.get('slide_settings', {})
+
+        # Load settings based on slide type
+        if 'Table' in slide_type and 'table' in slide_settings:
+            # Load table settings from slide
+            self.template_data['table_slide'] = slide_settings['table'].copy()
+
+        elif 'Chart' in slide_type and 'chart' in slide_settings:
+            # Load chart settings from slide
+            self.template_data['chart_slide'] = slide_settings['chart'].copy()
+
+        elif slide_type == 'Title Slide' and 'title' in slide_settings:
+            # Load title slide settings
+            self.template_data['title_slide'] = slide_settings['title'].copy()
+
+    def _safe_get_widget_text(self, widget_name, fallback=''):
+        """Safely get text from a QLineEdit widget, handling deleted widgets"""
+        try:
+            if hasattr(self, widget_name):
+                widget = getattr(self, widget_name)
+                if widget:
+                    return widget.text()
+        except (RuntimeError, AttributeError, SystemError):
+            pass
+        return fallback
+
+    def _safe_get_combo_text(self, widget_name, fallback=None):
+        """Safely get text from a QComboBox widget, handling deleted widgets"""
+        try:
+            if hasattr(self, widget_name):
+                widget = getattr(self, widget_name)
+                if widget:
+                    text = widget.currentText()
+                    return text if text else fallback
+        except (RuntimeError, AttributeError, SystemError):
+            pass
+        return fallback
+
+    def _safe_get_spinbox_value(self, widget_name, fallback=0):
+        """Safely get value from a QSpinBox widget, handling deleted widgets"""
+        try:
+            if hasattr(self, widget_name):
+                widget = getattr(self, widget_name)
+                if widget:
+                    return widget.value()
+        except (RuntimeError, AttributeError, SystemError):
+            pass
+        return fallback
+
+    def _safe_get_checkbox_state(self, widget_name, fallback=False):
+        """Safely get state from a QCheckBox widget, handling deleted widgets"""
+        try:
+            if hasattr(self, widget_name):
+                widget = getattr(self, widget_name)
+                if widget:
+                    return widget.isChecked()
+        except (RuntimeError, AttributeError, SystemError):
+            pass
+        return fallback
 
     def previous_slide_preview(self):
         """Navigate to previous slide"""
@@ -2260,38 +2679,70 @@ class TemplateBuilder(QMainWindow):
 
     def save_template(self):
         """Save template to JSON file in PPTGenerator format"""
-        # Update template data from UI
-        template_name = self.template_name_input.text()
-        industry = self.industry_combo.currentText()
-        font_family = self.font_combo.currentText()
+        print(f"[DEBUG] save_template: Starting save")
 
-        # Validate template before saving
-        is_valid, message = self.validate_template()
-        if not is_valid:
-            QMessageBox.warning(
-                self,
-                "Validation Error",
-                f"Template validation failed:\n\n{message}\n\nPlease fix the issue and try again."
-            )
+        # Prevent re-entrant calls
+        if hasattr(self, '_is_saving') and self._is_saving:
+            print(f"[DEBUG] save_template: Already saving, ignoring duplicate call")
             return
 
-        # Default save location: templates/configs/
-        import os
-        default_dir = os.path.join(os.getcwd(), "templates", "configs")
-        os.makedirs(default_dir, exist_ok=True)
-        default_filename = os.path.join(default_dir, f"{template_name.replace(' ', '_')}_Template.json")
+        self._is_saving = True
+        try:
+            # Save current component settings before saving template
+            self._save_table_styling_to_template()
+            self._save_chart_settings_to_template()
+            print(f"[DEBUG] save_template: After saving to template_data, columns are: {self.template_data.get('table_slide', {}).get('columns', 'NOT SET')}")
 
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Template",
-            default_filename,
-            "JSON Files (*.json)"
-        )
+            # IMPORTANT: Also update the current slide's slide_settings to match template_data
+            # This ensures that when the template is reloaded, the slide won't override with old data
+            if self.current_slide_index >= 0 and self.current_slide_index < len(self.template_data['slides']):
+                current_slide = self.template_data['slides'][self.current_slide_index]
+                slide_type = current_slide.get('type', '')
 
-        if file_path:
-            # Convert to PPTGenerator format
-            ppt_template = {
-                "metadata": {
+                if 'slide_settings' not in current_slide:
+                    current_slide['slide_settings'] = {}
+
+                # Update slide's settings to match the current template_data
+                if 'Table' in slide_type or self.selected_component_type == 'Table':
+                    current_slide['slide_settings']['table'] = self.template_data.get('table_slide', {}).copy()
+                    print(f"[DEBUG] save_template: Updated slide {self.current_slide_index} table settings with columns: {current_slide['slide_settings']['table'].get('columns', 'NOT SET')}")
+                elif 'Chart' in slide_type or self.selected_component_type == 'Chart':
+                    current_slide['slide_settings']['chart'] = self.template_data.get('chart_slide', {}).copy()
+                elif slide_type == 'Title Slide' or self.selected_component_type == 'Title Slide':
+                    current_slide['slide_settings']['title'] = self.template_data.get('title_slide', {}).copy()
+
+            # Update template data from UI
+            template_name = self.template_name_input.text()
+            industry = self.industry_combo.currentText()
+            font_family = self.font_combo.currentText()
+
+            # Validate template before saving
+            is_valid, message = self.validate_template()
+            if not is_valid:
+                QMessageBox.warning(
+                    self,
+                    "Validation Error",
+                    f"Template validation failed:\n\n{message}\n\nPlease fix the issue and try again."
+                )
+                return
+
+            # Default save location: templates/configs/
+            import os
+            default_dir = os.path.join(os.getcwd(), "templates", "configs")
+            os.makedirs(default_dir, exist_ok=True)
+            default_filename = os.path.join(default_dir, f"{template_name.replace(' ', '_')}_Template.json")
+
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Template",
+                default_filename,
+                "JSON Files (*.json)"
+            )
+
+            if file_path:
+                # Convert to PPTGenerator format
+                ppt_template = {
+                    "metadata": {
                     "name": template_name,
                     "description": f"{industry} report template",
                     "industry": industry,
@@ -2307,49 +2758,17 @@ class TemplateBuilder(QMainWindow):
                     "logo_path": self.template_data.get('logo_path'),
                     "embedded_logo_path": self.template_data.get('embedded_logo_path'),
                     "title_slide": {
-                        "title": self.title_slide_title_input.text(),
-                        "subtitle": self.title_slide_subtitle_input.text(),
-                        "description": self.title_slide_description_input.text(),
+                        "title": self._safe_get_widget_text('title_slide_title_input', self.template_data.get('title_slide', {}).get('title', '')),
+                        "subtitle": self._safe_get_widget_text('title_slide_subtitle_input', self.template_data.get('title_slide', {}).get('subtitle', '')),
+                        "description": self._safe_get_widget_text('title_slide_description_input', self.template_data.get('title_slide', {}).get('description', '')),
                         "logo_position": {"x": 5.0, "y": 1.0},
                         "logo_size": {"width": 2.0, "height": 1.5},
                         "title_position": {"x": 0.5, "y": 2.5},
                         "embedded_logo_position": {"x": 0.5, "y": 6.5},
                         "embedded_logo_size": {"width": 1.5, "height": 0.5}
                     },
-                    "table_slide": {
-                        "title": self.table_slide_title_input.text() if hasattr(self, 'table_slide_title_input') and self.table_slide_title_input else '',
-                        "subtitle": self.table_slide_subtitle_input.text() if hasattr(self, 'table_slide_subtitle_input') and self.table_slide_subtitle_input else '',
-                        "columns": self._get_selected_table_columns(),
-                        "sort_by": self.table_sort_column_combo.currentText() or None,
-                        "ascending": self.table_sort_order_combo.currentText() == "Ascending",
-                        "group_by": self.table_group_by_combo.currentText() or None,
-                        "note": self.table_slide_note_input.text(),
-                        "style": {
-                            "font_name": self.table_font_combo.currentText() if hasattr(self, 'table_font_combo') else "Calibri",
-                            "font_size": self.table_font_size_spin.value() if hasattr(self, 'table_font_size_spin') else 11,
-                            "header_color": self.template_data.get('table_slide', {}).get('style', {}).get('header_color', '#2563EB'),
-                            "header_text_color": self.template_data.get('table_slide', {}).get('style', {}).get('header_text_color', '#FFFFFF'),
-                            "row_color_1": self.template_data.get('table_slide', {}).get('style', {}).get('row_color_1', '#FFFFFF'),
-                            "row_color_2": self.template_data.get('table_slide', {}).get('style', {}).get('row_color_2', '#F9FAFB'),
-                            "text_color": self.template_data.get('table_slide', {}).get('style', {}).get('text_color', '#1F2937')
-                        }
-                    },
-                    "chart_slide": {
-                        "chart_type": self.chart_type_combo.currentText() if hasattr(self, 'chart_type_combo') and self.chart_type_combo else "column",
-                        "title": self.chart_title_input.text() if hasattr(self, 'chart_title_input') and self.chart_title_input else '',
-                        "x_column": self.chart_x_column_combo.currentText() if hasattr(self, 'chart_x_column_combo') and self.chart_x_column_combo else "Firma",
-                        "y_column": self.chart_y_column_combo.currentText() if hasattr(self, 'chart_y_column_combo') and self.chart_y_column_combo else "Net Etki",
-                        "calculation": self.chart_calculation_combo.currentText() if hasattr(self, 'chart_calculation_combo') and self.chart_calculation_combo else "sum",
-                        "sort_by": self.chart_sort_column_combo.currentText() if hasattr(self, 'chart_sort_column_combo') and self.chart_sort_column_combo and self.chart_sort_column_combo.currentText() else None,
-                        "ascending": self.chart_sort_order_combo.currentText() == "Ascending" if hasattr(self, 'chart_sort_order_combo') and self.chart_sort_order_combo else False,
-                        "top_n": self.chart_top_n_spin.value() if hasattr(self, 'chart_top_n_spin') and self.chart_top_n_spin and self.chart_top_n_spin.value() > 0 else None,
-                        "style": {
-                            "colors": self._get_selected_chart_colors(),
-                            "show_values": self.chart_show_values_check.isChecked() if hasattr(self, 'chart_show_values_check') and self.chart_show_values_check else True,
-                            "grid": self.chart_show_grid_check.isChecked() if hasattr(self, 'chart_show_grid_check') and self.chart_show_grid_check else True,
-                            "legend_position": self.chart_legend_combo.currentText() if hasattr(self, 'chart_legend_combo') and self.chart_legend_combo else "none"
-                        }
-                    },
+                    "table_slide": self._get_table_slide_data(),
+                    "chart_slide": self._get_chart_slide_data(),
                     "color_scheme": {
                         "primary": self.template_data['colors']['primary'],
                         "secondary": self.template_data['colors']['secondary'],
@@ -2373,6 +2792,10 @@ class TemplateBuilder(QMainWindow):
                 f"Slides: {len(self.template_data['slides'])}\n"
                 f"Format: PPTGenerator JSON"
             )
+            print(f"[DEBUG] save_template: Save completed successfully")
+        finally:
+            self._is_saving = False
+            print(f"[DEBUG] save_template: Cleared _is_saving flag")
 
     def load_template(self):
         """Load template from JSON file (supports PPTGenerator format)"""
@@ -2417,7 +2840,7 @@ class TemplateBuilder(QMainWindow):
                         'table_slide': {
                             'title': table_slide.get('title', 'Yönetici Özeti'),
                             'subtitle': table_slide.get('subtitle', 'Haberlerin Dağılımı'),
-                            'columns': table_slide.get('columns', ['Firma', 'Net Etki', 'Erişim', 'Reklam Eşdeğeri']),
+                            'columns': table_slide.get('columns', []),
                             'sort_by': table_slide.get('sort_by'),
                             'ascending': table_slide.get('ascending', False),
                             'group_by': table_slide.get('group_by'),
@@ -2516,14 +2939,40 @@ class TemplateBuilder(QMainWindow):
                 self.table_slide_subtitle_input.setText(table_slide.get('subtitle', 'Haberlerin Dağılımı'))
                 self.table_slide_note_input.setText(table_slide.get('note', ''))
                 
-                # Set selected columns
+                # Set selected columns - respect what user saved
                 selected_columns = table_slide.get('columns', [])
-                for i in range(self.table_columns_list.count()):
-                    item = self.table_columns_list.item(i)
-                    if item.text() in selected_columns:
-                        item.setCheckState(Qt.CheckState.Checked)
-                    else:
-                        item.setCheckState(Qt.CheckState.Unchecked)
+                print(f"[DEBUG] load_template: Loaded columns from JSON: {selected_columns}")
+                # Ensure selected_columns is a list
+                if not isinstance(selected_columns, list):
+                    selected_columns = []
+                    print(f"[DEBUG] load_template: Columns was not a list, using empty list: {selected_columns}")
+
+                # Only set checkboxes if the widget exists
+                if hasattr(self, 'table_columns_list') and self.table_columns_list:
+                    try:
+                        # Temporarily disconnect the signal to avoid triggering saves during load
+                        self.table_columns_list.itemChanged.disconnect(self.on_table_slide_changed)
+                        print(f"[DEBUG] load_template: Disconnected itemChanged signal")
+                    except:
+                        print(f"[DEBUG] load_template: Could not disconnect signal (not connected yet)")
+                        pass  # Signal might not be connected yet
+
+                    for i in range(self.table_columns_list.count()):
+                        item = self.table_columns_list.item(i)
+                        if item:
+                            item_text = item.text()
+                            if item_text in selected_columns:
+                                item.setCheckState(Qt.CheckState.Checked)
+                                print(f"[DEBUG] load_template: Set '{item_text}' to CHECKED")
+                            else:
+                                item.setCheckState(Qt.CheckState.Unchecked)
+                                print(f"[DEBUG] load_template: Set '{item_text}' to UNCHECKED")
+                    
+                    # Reconnect the signal
+                    try:
+                        self.table_columns_list.itemChanged.connect(self.on_table_slide_changed)
+                    except:
+                        pass  # Signal might already be connected
                 
                 # Set sort column
                 sort_by = table_slide.get('sort_by')

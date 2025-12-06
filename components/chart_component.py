@@ -474,8 +474,9 @@ class ChartComponent(BaseComponent):
             return self.colors
 
         if self.colors == 'brand':
-            # Use template brand colors (TODO: get from template)
-            return ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+            # Use template brand colors
+            template_colors = self.get_template_color_list()
+            return template_colors
 
         # Default matplotlib colors - with robust error handling
         try:

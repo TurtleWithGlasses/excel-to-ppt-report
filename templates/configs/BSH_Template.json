@@ -12,6 +12,18 @@
     "page_size": "16:9",
     "default_font": "Calibri",
     "default_font_size": 11,
+    "logo_path": "assets/logos/bsh_logo.png",
+    "embedded_logo_path": "assets/logos/desibel_logo.png",
+    "title_slide": {
+      "title": "BSH ve Rakipleri Medya Analizi",
+      "subtitle": "{month} {year}",
+      "description": "Beyaz Eşya Sektörü - Medya Takip Raporu",
+      "logo_position": {"x": 5.0, "y": 1.0},
+      "logo_size": {"width": 2.0, "height": 1.5},
+      "title_position": {"x": 0.5, "y": 2.5},
+      "embedded_logo_position": {"x": 0.5, "y": 6.5},
+      "embedded_logo_size": {"width": 1.5, "height": 0.5}
+    },
     "color_scheme": {
       "primary": "#2563EB",
       "secondary": "#10B981",
@@ -28,9 +40,20 @@
       "layout": "blank",
       "components": [
         {
+          "type": "image",
+          "position": {"x": 5.0, "y": 1.0},
+          "size": {"width": 2.0, "height": 1.5},
+          "data_source": {
+            "type": "template_logo"
+          },
+          "style": {
+            "maintain_aspect": true
+          }
+        },
+        {
           "type": "text",
-          "content": "BSH ve Rakipleri Medya Analizi",
-          "position": {"x": 0.5, "y": 2.0},
+          "content": "{title_slide_title}",
+          "position": {"x": 0.5, "y": 2.5},
           "size": {"width": 9.0, "height": 1.0},
           "style": {
             "font_name": "Calibri",
@@ -42,8 +65,8 @@
         },
         {
           "type": "text",
-          "content": "{month} {year}",
-          "position": {"x": 0.5, "y": 3.2},
+          "content": "{title_slide_subtitle}",
+          "position": {"x": 0.5, "y": 3.5},
           "size": {"width": 9.0, "height": 0.8},
           "style": {
             "font_size": 28,
@@ -53,8 +76,8 @@
         },
         {
           "type": "text",
-          "content": "Beyaz Eşya Sektörü - Medya Takip Raporu",
-          "position": {"x": 0.5, "y": 4.2},
+          "content": "{title_slide_description}",
+          "position": {"x": 0.5, "y": 4.5},
           "size": {"width": 9.0, "height": 0.6},
           "style": {
             "font_size": 16,
@@ -63,14 +86,14 @@
           }
         },
         {
-          "type": "text",
-          "content": "Rapor Tarihi: {date}",
-          "position": {"x": 0.5, "y": 5.0},
-          "size": {"width": 9.0, "height": 0.5},
+          "type": "image",
+          "position": {"x": 0.5, "y": 6.5},
+          "size": {"width": 1.5, "height": 0.5},
+          "data_source": {
+            "type": "template_embedded_logo"
+          },
           "style": {
-            "font_size": 12,
-            "alignment": "center",
-            "color": "#9CA3AF"
+            "maintain_aspect": true
           }
         }
       ]

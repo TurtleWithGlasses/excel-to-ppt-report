@@ -165,7 +165,7 @@ class DataMapper:
         config_vars = component_config.get('variables', {})
         variables.update(config_vars)
 
-        # Add additional variables
+        # Add additional variables (may include template settings like title_slide)
         if additional_vars:
             variables.update(additional_vars)
 

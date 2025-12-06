@@ -4,7 +4,13 @@
       "Bash(git commit:*)",
       "Bash(find:*)",
       "Bash(python:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(git branch:*)"
     ],
     "deny": [],
     "ask": []

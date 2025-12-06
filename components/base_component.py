@@ -6,7 +6,7 @@ inherit from. It defines the common interface and shared functionality.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pptx.slide import Slide
 from pptx.util import Inches, Pt
 
@@ -19,7 +19,7 @@ class BaseComponent(ABC):
     their content on a PowerPoint slide.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], template: Optional[Dict[str, Any]] = None):
         """
         Initialize component with configuration.
 
@@ -30,9 +30,11 @@ class BaseComponent(ABC):
                 - size: {width, height} in inches
                 - data_source: Data configuration (varies by component)
                 - style: Visual styling options
+            template (dict, optional): Template dictionary with settings (for brand colors)
         """
         self.config = config
         self.type = config.get('type', 'unknown')
+        self.template = template  # Store template reference for brand colors
 
         # Position and size (in inches)
         position = config.get('position', {'x': 0.5, 'y': 1.0})
@@ -152,6 +154,67 @@ class BaseComponent(ABC):
             bool: True if italic
         """
         return self.style.get('italic', False)
+
+    def get_template_colors(self) -> Optional[Dict[str, str]]:
+        """
+        Get brand colors from template settings.
+
+        Returns:
+            Dictionary of color names to hex values, or None if not available
+            Example: {'primary': '#2563EB', 'secondary': '#10B981', ...}
+
+        Example:
+            colors = self.get_template_colors()
+            if colors:
+                primary = colors.get('primary')
+        """
+        if not self.template:
+            return None
+
+        settings = self.template.get('settings', {})
+        color_scheme = settings.get('color_scheme', {})
+
+        if not color_scheme:
+            return None
+
+        return color_scheme
+
+    def get_template_color_list(self) -> List[str]:
+        """
+        Get brand colors as a list of hex values for use in charts/components.
+
+        Returns:
+            List of hex color strings in order: primary, secondary, accent, negative, neutral
+            Falls back to default colors if template colors not available
+
+        Example:
+            colors = self.get_template_color_list()
+            # Returns: ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#6B7280']
+        """
+        color_scheme = self.get_template_colors()
+
+        if not color_scheme:
+            # Default fallback colors
+            return ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+
+        # Extract colors in priority order
+        colors = []
+        color_keys = ['primary', 'secondary', 'accent', 'negative', 'neutral']
+
+        for key in color_keys:
+            if key in color_scheme:
+                colors.append(color_scheme[key])
+
+        # Add any additional colors from scheme
+        for key, value in color_scheme.items():
+            if key not in color_keys and isinstance(value, str) and value.startswith('#'):
+                colors.append(value)
+
+        # Ensure we have at least some colors
+        if not colors:
+            return ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+
+        return colors
 
     def to_dict(self) -> Dict[str, Any]:
         """
