@@ -889,6 +889,7 @@ class TemplateBuilder(QMainWindow):
         existing_bg_color = style_settings.get('background_color', '#FFFFFF')
         existing_header_text_color = style_settings.get('header_text_color', '#FFFFFF')
         existing_text_color = style_settings.get('text_color', '#1F2937')
+        existing_border_color = style_settings.get('border_color', '#E5E7EB')
         existing_header_align = style_settings.get('header_alignment', 'Center')
         existing_text_align = style_settings.get('text_alignment', 'Left')
         existing_header_bold = style_settings.get('header_bold', True)
@@ -965,6 +966,8 @@ class TemplateBuilder(QMainWindow):
         self.table_header_text_color_label.setText(existing_header_text_color)
         self.table_text_color_btn.setStyleSheet(f"background-color: {existing_text_color}; border: 1px solid #E5E7EB;")
         self.table_text_color_label.setText(existing_text_color)
+        self.table_border_color_btn.setStyleSheet(f"background-color: {existing_border_color}; border: 1px solid #E5E7EB;")
+        self.table_border_color_label.setText(existing_border_color)
 
         # Set alignments
         header_align_index = self.table_header_align_combo.findText(existing_header_align)
@@ -1034,6 +1037,11 @@ class TemplateBuilder(QMainWindow):
         text_color_layout.addWidget(self.table_text_color_btn)
         text_color_layout.addWidget(self.table_text_color_label)
         form_layout.addRow("Data Text Color:", text_color_layout)
+
+        border_color_layout = QHBoxLayout()
+        border_color_layout.addWidget(self.table_border_color_btn)
+        border_color_layout.addWidget(self.table_border_color_label)
+        form_layout.addRow("Border/Grid Color:", border_color_layout)
 
         # Alignment section
         form_layout.addRow("Header Alignment:", self.table_header_align_combo)
@@ -1140,6 +1148,13 @@ class TemplateBuilder(QMainWindow):
         self.table_text_color_btn.setStyleSheet("background-color: #1F2937; border: 1px solid #E5E7EB;")
         self.table_text_color_btn.clicked.connect(lambda: self.pick_table_color('text'))
         self.table_text_color_label = QLabel("#1F2937")
+
+        # Border/Grid color
+        self.table_border_color_btn = QPushButton()
+        self.table_border_color_btn.setFixedSize(40, 30)
+        self.table_border_color_btn.setStyleSheet("background-color: #E5E7EB; border: 1px solid #E5E7EB;")
+        self.table_border_color_btn.clicked.connect(lambda: self.pick_table_color('border'))
+        self.table_border_color_label = QLabel("#E5E7EB")
 
         # Text alignment
         self.table_text_align_combo = QComboBox()
@@ -1491,7 +1506,8 @@ class TemplateBuilder(QMainWindow):
             'row2': ('row_color_2', '#F9FAFB'),
             'background': ('background_color', '#FFFFFF'),
             'header_text': ('header_text_color', '#FFFFFF'),
-            'text': ('text_color', '#1F2937')
+            'text': ('text_color', '#1F2937'),
+            'border': ('border_color', '#E5E7EB')
         }
         
         style_key, default_color = color_map.get(color_type, ('header_color', '#2563EB'))
@@ -1529,6 +1545,9 @@ class TemplateBuilder(QMainWindow):
             elif color_type == 'text':
                 self.table_text_color_btn.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #E5E7EB;")
                 self.table_text_color_label.setText(hex_color)
+            elif color_type == 'border':
+                self.table_border_color_btn.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #E5E7EB;")
+                self.table_border_color_label.setText(hex_color)
 
             # Update preview
             self.on_table_slide_changed()
@@ -2027,6 +2046,7 @@ class TemplateBuilder(QMainWindow):
         row_color_2 = QColor(table_style.get('row_color_2', '#F9FAFB'))
         text_color = QColor(table_style.get('text_color', '#1F2937'))
         bg_color = QColor(table_style.get('background_color', '#FFFFFF'))
+        border_color = QColor(table_style.get('border_color', '#E5E7EB'))
 
         # Get text style settings
         header_bold = table_style.get('header_bold', True)
@@ -2117,7 +2137,7 @@ class TemplateBuilder(QMainWindow):
             self.preview_scene.addRect(
                 col_x, table_y,
                 col_width, row_height,
-                QColor("#E5E7EB"), QColor("#E5E7EB")
+                border_color, border_color
             )
             # Header text - truncate if too long for cell
             header_text = col
@@ -2171,7 +2191,7 @@ class TemplateBuilder(QMainWindow):
                 self.preview_scene.addRect(
                     col_x, row_y,
                     col_width, row_height,
-                    QColor("#E5E7EB"), QColor("#E5E7EB")
+                    border_color, border_color
                 )
                 
                 # Cell text (placeholder or empty)
@@ -2356,6 +2376,8 @@ class TemplateBuilder(QMainWindow):
                 style['header_text_color'] = self.table_header_text_color_label.text()
             if hasattr(self, 'table_text_color_label'):
                 style['text_color'] = self.table_text_color_label.text()
+            if hasattr(self, 'table_border_color_label'):
+                style['border_color'] = self.table_border_color_label.text()
 
             # Save alignment settings
             if hasattr(self, 'table_header_align_combo'):
@@ -2474,6 +2496,7 @@ class TemplateBuilder(QMainWindow):
         style.setdefault('row_color_2', '#F9FAFB')
         style.setdefault('text_color', '#1F2937')
         style.setdefault('background_color', '#FFFFFF')
+        style.setdefault('border_color', '#E5E7EB')
         style.setdefault('header_alignment', 'Center')
         style.setdefault('text_alignment', 'Left')
         style.setdefault('header_bold', True)
