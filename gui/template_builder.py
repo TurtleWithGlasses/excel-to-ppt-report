@@ -1213,6 +1213,10 @@ class TemplateBuilder(QMainWindow):
         
         # Get style settings
         style_settings = chart_slide_settings.get('style', {})
+        existing_font = style_settings.get('font_name', 'Calibri')
+        existing_font_size = style_settings.get('font_size', 11)
+        existing_x_label = style_settings.get('x_label', '')
+        existing_y_label = style_settings.get('y_label', '')
         existing_colors = style_settings.get('colors', ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'])
         existing_show_values = style_settings.get('show_values')
         if existing_show_values is None:
@@ -1228,7 +1232,19 @@ class TemplateBuilder(QMainWindow):
         # Set existing values from template_data
         if existing_title:
             self.chart_title_input.setText(existing_title)
-        
+
+        # Set font
+        font_index = self.chart_font_combo.findText(existing_font)
+        if font_index >= 0:
+            self.chart_font_combo.setCurrentIndex(font_index)
+        self.chart_font_size_spin.setValue(existing_font_size)
+
+        # Set axis labels
+        if existing_x_label:
+            self.chart_x_label_input.setText(existing_x_label)
+        if existing_y_label:
+            self.chart_y_label_input.setText(existing_y_label)
+
         # Set chart type
         chart_type_index = self.chart_type_combo.findText(existing_chart_type)
         if chart_type_index >= 0:
@@ -1287,6 +1303,10 @@ class TemplateBuilder(QMainWindow):
         
         form_layout.addRow("Chart Type:", self.chart_type_combo)
         form_layout.addRow("Chart Title:", self.chart_title_input)
+        form_layout.addRow("Font Family:", self.chart_font_combo)
+        form_layout.addRow("Font Size:", self.chart_font_size_spin)
+        form_layout.addRow("X-Axis Label:", self.chart_x_label_input)
+        form_layout.addRow("Y-Axis Label:", self.chart_y_label_input)
         form_layout.addRow("X-Axis (Categories):", self.chart_x_column_combo)
         form_layout.addRow("Y-Axis (Values):", self.chart_y_column_combo)
         form_layout.addRow("Calculation:", self.chart_calculation_combo)
@@ -1324,7 +1344,27 @@ class TemplateBuilder(QMainWindow):
         self.chart_title_input = QLineEdit()
         self.chart_title_input.setPlaceholderText("e.g., Kurumların Yansıma Sayısı Bazında Karşılaştırılması")
         self.chart_title_input.textChanged.connect(self.on_chart_changed)
-        
+
+        # Font controls
+        self.chart_font_combo = QComboBox()
+        self.chart_font_combo.addItems(['Calibri', 'Arial', 'Segoe UI', 'Times New Roman', 'Verdana'])
+        self.chart_font_combo.currentTextChanged.connect(self.on_chart_changed)
+
+        self.chart_font_size_spin = QSpinBox()
+        self.chart_font_size_spin.setMinimum(8)
+        self.chart_font_size_spin.setMaximum(24)
+        self.chart_font_size_spin.setValue(11)
+        self.chart_font_size_spin.valueChanged.connect(self.on_chart_changed)
+
+        # Axis labels
+        self.chart_x_label_input = QLineEdit()
+        self.chart_x_label_input.setPlaceholderText("e.g., Firmalar")
+        self.chart_x_label_input.textChanged.connect(self.on_chart_changed)
+
+        self.chart_y_label_input = QLineEdit()
+        self.chart_y_label_input.setPlaceholderText("e.g., Net Etki")
+        self.chart_y_label_input.textChanged.connect(self.on_chart_changed)
+
         # Common columns from Excel file
         common_columns = ['Firma', 'Kurum', 'Toplam', 'Pozitif', 'Negatif', 'Erişim', 
                          'STXCM', 'StxCm', 'Reklam Eşdeğeri', 'Net Etki', 'Medya Kapsam', 
@@ -2436,6 +2476,14 @@ class TemplateBuilder(QMainWindow):
                 chart_slide['top_n'] = top_n if top_n > 0 else None
 
             # Save style settings
+            if hasattr(self, 'chart_font_combo'):
+                style['font_name'] = self.chart_font_combo.currentText()
+            if hasattr(self, 'chart_font_size_spin'):
+                style['font_size'] = self.chart_font_size_spin.value()
+            if hasattr(self, 'chart_x_label_input'):
+                style['x_label'] = self.chart_x_label_input.text()
+            if hasattr(self, 'chart_y_label_input'):
+                style['y_label'] = self.chart_y_label_input.text()
             style['colors'] = self._get_selected_chart_colors()
             if hasattr(self, 'chart_show_values_check'):
                 style['show_values'] = self.chart_show_values_check.isChecked()
