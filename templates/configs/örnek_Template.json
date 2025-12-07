@@ -55,7 +55,7 @@
         "Medya Kapsam"
       ],
       "sort_by": null,
-      "ascending": false,
+      "ascending": true,
       "group_by": null,
       "note": "",
       "style": {
@@ -72,7 +72,8 @@
         "header_bold": true,
         "header_italic": false,
         "text_bold": true,
-        "text_italic": false
+        "text_italic": false,
+        "border_color": "#00AAFF"
       }
     },
     "chart_slide": {
@@ -161,7 +162,7 @@
             "Medya Kapsam"
           ],
           "sort_by": null,
-          "ascending": false,
+          "ascending": true,
           "group_by": null,
           "note": "",
           "style": {
@@ -178,7 +179,8 @@
             "header_bold": true,
             "header_italic": false,
             "text_bold": true,
-            "text_italic": false
+            "text_italic": false,
+            "border_color": "#00AAFF"
           }
         }
       }

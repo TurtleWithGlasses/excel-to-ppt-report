@@ -966,8 +966,9 @@ class TemplateBuilder(QMainWindow):
         self.table_header_text_color_label.setText(existing_header_text_color)
         self.table_text_color_btn.setStyleSheet(f"background-color: {existing_text_color}; border: 1px solid #E5E7EB;")
         self.table_text_color_label.setText(existing_text_color)
-        self.table_border_color_btn.setStyleSheet(f"background-color: {existing_border_color}; border: 1px solid #E5E7EB;")
-        self.table_border_color_label.setText(existing_border_color)
+        if hasattr(self, 'table_border_color_btn'):
+            self.table_border_color_btn.setStyleSheet(f"background-color: {existing_border_color}; border: 1px solid #E5E7EB;")
+            self.table_border_color_label.setText(existing_border_color)
 
         # Set alignments
         header_align_index = self.table_header_align_combo.findText(existing_header_align)
