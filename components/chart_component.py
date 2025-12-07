@@ -347,12 +347,15 @@ class ChartComponent(BaseComponent):
                 columns=self.series_column,
                 aggfunc='sum'
             )
+            # Use 'bar' which creates vertical bars in pandas (confusing naming)
             df_pivot.plot(kind='bar', ax=ax, color=colors, width=0.7)
         else:
-            # Single series
+            # Single series vertical bars
             x_data = df[self.x_column].astype(str)
             y_data = df[self.y_column]
-            ax.bar(x_data, y_data, color=colors[0] if colors else None, width=0.6)
+            # Cycle through colors for multiple bars
+            bar_colors = [colors[i % len(colors)] if colors else None for i in range(len(y_data))]
+            ax.bar(x_data, y_data, color=bar_colors, width=0.6)
 
             if self.show_values:
                 for i, v in enumerate(y_data):
@@ -370,33 +373,42 @@ class ChartComponent(BaseComponent):
             )
             df_pivot.plot(kind='barh', ax=ax, color=colors, height=0.7)
         else:
-            # Single series
+            # Single series horizontal bars
             x_data = df[self.x_column].astype(str)
             y_data = df[self.y_column]
-            ax.barh(x_data, y_data, color=colors[0] if colors else None, height=0.6)
+            # Cycle through colors for multiple bars
+            bar_colors = [colors[i % len(colors)] if colors else None for i in range(len(y_data))]
+            ax.barh(x_data, y_data, color=bar_colors, height=0.6)
 
             if self.show_values:
                 for i, v in enumerate(y_data):
-                    ax.text(v, i, f'{v:,.0f}', ha='left', va='center', fontsize=8)
+                    ax.text(v, i, f' {v:,.0f}', ha='left', va='center', fontsize=8)
 
     def _create_pie_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create pie chart."""
         labels = df[self.x_column].astype(str) if self.x_column else df.index
         values = df[self.y_column]
 
-        wedges, texts, autotexts = ax.pie(
+        # Create pie chart with optional percentage labels
+        pie_result = ax.pie(
             values,
             labels=labels,
             colors=colors,
             autopct='%1.1f%%' if self.show_values else None,
-            startangle=90
+            startangle=90,
+            textprops={'fontsize': self.chart_font_size}
         )
 
-        # Style percentages
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontsize(9)
-            autotext.set_weight('bold')
+        # Unpack the result - could be 2 or 3 elements depending on autopct
+        if self.show_values:
+            wedges, texts, autotexts = pie_result
+            # Style percentages
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontsize(9)
+                autotext.set_weight('bold')
+        else:
+            wedges, texts = pie_result
 
         ax.axis('equal')
 
@@ -408,26 +420,30 @@ class ChartComponent(BaseComponent):
                 series_data = df[df[self.series_column] == series_name]
                 color = colors[idx % len(colors)] if colors else None
                 ax.plot(
-                    series_data[self.x_column],
+                    series_data[self.x_column].astype(str),
                     series_data[self.y_column],
                     marker='o',
                     label=series_name,
                     color=color,
-                    linewidth=2
+                    linewidth=2,
+                    markersize=6
                 )
         else:
             # Single series
+            x_data = df[self.x_column].astype(str)
+            y_data = df[self.y_column]
             ax.plot(
-                df[self.x_column],
-                df[self.y_column],
+                x_data,
+                y_data,
                 marker='o',
                 color=colors[0] if colors else None,
-                linewidth=2
+                linewidth=2,
+                markersize=6
             )
 
             if self.show_values:
-                for x, y in zip(df[self.x_column], df[self.y_column]):
-                    ax.text(x, y, f'{y:,.0f}', ha='center', va='bottom', fontsize=8)
+                for i, (x, y) in enumerate(zip(x_data, y_data)):
+                    ax.text(i, y, f'{y:,.0f}', ha='center', va='bottom', fontsize=8)
 
     def _create_stacked_column_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create stacked vertical column chart."""

@@ -1977,24 +1977,25 @@ class TemplateBuilder(QMainWindow):
             title_item.setDefaultTextColor(QColor("#1F2937"))
             title_item.setPos(0.5 * INCH_TO_PIXEL, 0.3 * INCH_TO_PIXEL)
         
-        # Render chart preview (simplified bar chart representation)
+        # Get chart type
+        try:
+            chart_type = self.chart_type_combo.currentText() if hasattr(self, 'chart_type_combo') and self.chart_type_combo else chart_settings.get('chart_type', 'column')
+        except RuntimeError:
+            chart_type = chart_settings.get('chart_type', 'column')
+
+        # Render chart preview based on type
         chart_y = 1.0 * INCH_TO_PIXEL
         chart_x = 0.5 * INCH_TO_PIXEL
         chart_width = 9.0 * INCH_TO_PIXEL
         chart_height = 3.5 * INCH_TO_PIXEL
-        
+
         # Chart background
         self.preview_scene.addRect(
             chart_x, chart_y,
             chart_width, chart_height,
             QColor("#FFFFFF"), QColor("#E5E7EB")
         )
-        
-        # Sample bars (5 bars for preview)
-        num_bars = 5
-        bar_width = chart_width / (num_bars + 1)
-        max_height = chart_height * 0.8
-        
+
         # Get colors from UI or settings
         try:
             if hasattr(self, 'chart_colors_list') and self.chart_colors_list:
@@ -2005,41 +2006,213 @@ class TemplateBuilder(QMainWindow):
         except RuntimeError:
             chart_style = chart_settings.get('style', {})
             colors = chart_style.get('colors', ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'])
-        
+
         if not colors:
             colors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
-        
+
+        # Render appropriate chart type
+        if chart_type == 'pie':
+            self._render_pie_preview(chart_x, chart_y, chart_width, chart_height, colors)
+        elif chart_type == 'line':
+            self._render_line_preview(chart_x, chart_y, chart_width, chart_height, colors)
+        elif chart_type == 'bar':
+            self._render_bar_preview(chart_x, chart_y, chart_width, chart_height, colors)
+        elif chart_type == 'column':
+            self._render_column_preview(chart_x, chart_y, chart_width, chart_height, colors)
+        elif chart_type == 'stacked_column':
+            self._render_stacked_column_preview(chart_x, chart_y, chart_width, chart_height, colors)
+        elif chart_type == 'stacked_bar':
+            self._render_stacked_bar_preview(chart_x, chart_y, chart_width, chart_height, colors)
+        else:
+            # Default to column
+            self._render_column_preview(chart_x, chart_y, chart_width, chart_height, colors)
+
+    def _render_column_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+        """Render column (vertical bar) chart preview"""
+        num_bars = 5
+        bar_width = chart_width / (num_bars + 1)
+        max_height = chart_height * 0.8
+
         for i in range(num_bars):
             bar_x = chart_x + (i + 0.5) * bar_width
-            bar_height = max_height * (0.9 - i * 0.15)  # Decreasing heights
+            bar_height = max_height * (0.9 - i * 0.15)
             bar_y = chart_y + chart_height - bar_height
-            
-            # Bar color
+
             color_index = i % len(colors)
             bar_color = QColor(colors[color_index])
-            
-            # Draw bar
+
             self.preview_scene.addRect(
                 bar_x - bar_width * 0.3, bar_y,
                 bar_width * 0.6, bar_height,
                 bar_color, bar_color
             )
-            
-            # Value label on top
+
             value_text = str(100 - i * 15)
             value_font = QFont("Calibri", 9)
             value_item = self.preview_scene.addText(value_text, value_font)
             value_item.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_item.boundingRect()
             value_item.setPos(bar_x - value_rect.width() / 2, bar_y - value_rect.height() - 2)
-            
-            # Category label below
+
             category_text = f"Item {i + 1}"
             category_font = QFont("Calibri", 8)
             category_item = self.preview_scene.addText(category_text, category_font)
             category_item.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_item.boundingRect()
             category_item.setPos(bar_x - category_rect.width() / 2, chart_y + chart_height + 5)
+
+    def _render_bar_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+        """Render horizontal bar chart preview"""
+        num_bars = 5
+        bar_height = chart_height / (num_bars + 1)
+        max_width = chart_width * 0.8
+
+        for i in range(num_bars):
+            bar_y = chart_y + (i + 0.5) * bar_height
+            bar_width = max_width * (0.9 - i * 0.15)
+
+            color_index = i % len(colors)
+            bar_color = QColor(colors[color_index])
+
+            self.preview_scene.addRect(
+                chart_x + 100, bar_y - bar_height * 0.3,
+                bar_width, bar_height * 0.6,
+                bar_color, bar_color
+            )
+
+            value_text = str(100 - i * 15)
+            value_font = QFont("Calibri", 9)
+            value_item = self.preview_scene.addText(value_text, value_font)
+            value_item.setDefaultTextColor(QColor("#1F2937"))
+            value_rect = value_item.boundingRect()
+            value_item.setPos(chart_x + 100 + bar_width + 5, bar_y - value_rect.height() / 2)
+
+            category_text = f"Item {i + 1}"
+            category_font = QFont("Calibri", 8)
+            category_item = self.preview_scene.addText(category_text, category_font)
+            category_item.setDefaultTextColor(QColor("#6B7280"))
+            category_rect = category_item.boundingRect()
+            category_item.setPos(chart_x + 10, bar_y - category_rect.height() / 2)
+
+    def _render_pie_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+        """Render pie chart preview"""
+        import math
+        center_x = chart_x + chart_width / 2
+        center_y = chart_y + chart_height / 2
+        radius = min(chart_width, chart_height) * 0.35
+
+        # Draw 5 slices
+        angles = [72, 72, 72, 72, 144]  # degrees for each slice
+        start_angle = 0
+
+        for i, angle in enumerate(angles):
+            color_index = i % len(colors)
+            slice_color = QColor(colors[color_index])
+
+            # Use QPainterPath to draw pie slice
+            from PyQt6.QtGui import QPainterPath
+            from PyQt6.QtCore import QRectF
+
+            rect = QRectF(center_x - radius, center_y - radius, radius * 2, radius * 2)
+            path = QPainterPath()
+            path.moveTo(center_x, center_y)
+            path.arcTo(rect, start_angle, angle)
+            path.closeSubpath()
+
+            self.preview_scene.addPath(path, slice_color, slice_color)
+
+            start_angle += angle
+
+    def _render_line_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+        """Render line chart preview"""
+        from PyQt6.QtGui import QPen
+        from PyQt6.QtCore import Qt
+
+        num_points = 6
+        point_spacing = chart_width / (num_points + 1)
+
+        # Generate sample data points
+        heights = [0.3, 0.6, 0.5, 0.7, 0.4, 0.8]
+
+        pen = QPen(QColor(colors[0]))
+        pen.setWidth(3)
+
+        for i in range(len(heights) - 1):
+            x1 = chart_x + (i + 1) * point_spacing
+            y1 = chart_y + chart_height - (heights[i] * chart_height * 0.8)
+            x2 = chart_x + (i + 2) * point_spacing
+            y2 = chart_y + chart_height - (heights[i + 1] * chart_height * 0.8)
+
+            # Draw line
+            self.preview_scene.addLine(x1, y1, x2, y2, pen)
+
+            # Draw point
+            self.preview_scene.addEllipse(x1 - 4, y1 - 4, 8, 8, pen, QColor(colors[0]))
+
+        # Draw last point
+        x_last = chart_x + len(heights) * point_spacing
+        y_last = chart_y + chart_height - (heights[-1] * chart_height * 0.8)
+        self.preview_scene.addEllipse(x_last - 4, y_last - 4, 8, 8, pen, QColor(colors[0]))
+
+    def _render_stacked_column_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+        """Render stacked vertical column chart preview"""
+        num_bars = 4
+        bar_width = chart_width / (num_bars + 1)
+
+        for i in range(num_bars):
+            bar_x = chart_x + (i + 0.5) * bar_width
+            current_y = chart_y + chart_height
+
+            # Draw 3 segments per bar (stacked vertically)
+            segments = [0.3, 0.25, 0.2]
+            for j, segment_height in enumerate(segments):
+                color_index = j % len(colors)
+                segment_color = QColor(colors[color_index])
+
+                height = chart_height * segment_height
+                current_y -= height
+                self.preview_scene.addRect(
+                    bar_x - bar_width * 0.3, current_y,
+                    bar_width * 0.6, height,
+                    segment_color, segment_color
+                )
+
+            category_text = f"Item {i + 1}"
+            category_font = QFont("Calibri", 8)
+            category_item = self.preview_scene.addText(category_text, category_font)
+            category_item.setDefaultTextColor(QColor("#6B7280"))
+            category_rect = category_item.boundingRect()
+            category_item.setPos(bar_x - category_rect.width() / 2, chart_y + chart_height + 5)
+
+    def _render_stacked_bar_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+        """Render stacked horizontal bar chart preview"""
+        num_bars = 4
+        bar_height = chart_height / (num_bars + 1)
+
+        for i in range(num_bars):
+            bar_y = chart_y + (i + 0.5) * bar_height
+            current_x = chart_x + 100
+
+            # Draw 3 segments per bar
+            segments = [0.3, 0.25, 0.2]
+            for j, segment_width in enumerate(segments):
+                color_index = j % len(colors)
+                segment_color = QColor(colors[color_index])
+
+                width = chart_width * segment_width
+                self.preview_scene.addRect(
+                    current_x, bar_y - bar_height * 0.3,
+                    width, bar_height * 0.6,
+                    segment_color, segment_color
+                )
+                current_x += width
+
+            category_text = f"Item {i + 1}"
+            category_font = QFont("Calibri", 8)
+            category_item = self.preview_scene.addText(category_text, category_font)
+            category_item.setDefaultTextColor(QColor("#6B7280"))
+            category_rect = category_item.boundingRect()
+            category_item.setPos(chart_x + 10, bar_y - category_rect.height() / 2)
 
     def _render_table_slide_preview(self, slide):
         """Render table slide components in preview"""
