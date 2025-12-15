@@ -79,7 +79,7 @@ class ChartComponent(BaseComponent):
         # Chart styling
         self.colors = self.style.get('colors', 'default')
         self.legend_position = self.style.get('legend_position', 'bottom')
-        self.show_values = self.style.get('show_values', False)
+        self.show_values = self.style.get('show_values', True)  # Default to True - show labels
         self.chart_title = self.style.get('title', '')
         self.x_label = self.style.get('x_label', '')
         self.y_label = self.style.get('y_label', '')
@@ -345,31 +345,83 @@ class ChartComponent(BaseComponent):
                     ax.text(v, i, self._format_value(v), ha='left', va='center', fontsize=8)
 
     def _create_pie_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
-        """Create pie chart."""
+        """Create pie chart with labels showing category, value, and percentage outside the pie."""
         labels = df[self.x_column].astype(str) if self.x_column else df.index
         # Ensure values are numeric for pie chart
         values = pd.to_numeric(df[self.y_column], errors='coerce').fillna(0)
-        
+
         # Handle edge case where all values are 0 or negative
         if values.sum() <= 0:
             # Replace with equal slices to avoid divide by zero
             values = pd.Series([1] * len(values), index=values.index)
             logger.debug("Pie chart: All values were zero, using equal slices")
 
+        # Calculate total for percentage labels
+        total = values.sum()
+        num_slices = len(values)
+
+        # Adjust font sizes based on number of slices
+        label_fontsize = max(7, 10 - num_slices // 3)
+        pct_fontsize = max(6, 9 - num_slices // 3)
+
+        # Create custom label function that shows category, value and percentage
+        def make_label_func(labels_list, values_list):
+            idx = [0]  # Use list to maintain state across calls
+            def label_func(pct):
+                i = idx[0]
+                idx[0] += 1
+                if i < len(labels_list) and i < len(values_list):
+                    cat = str(labels_list.iloc[i]) if hasattr(labels_list, 'iloc') else str(labels_list[i])
+                    val = values_list.iloc[i] if hasattr(values_list, 'iloc') else values_list[i]
+                    # Truncate long category names
+                    if len(cat) > 12:
+                        cat = cat[:10] + ".."
+                    return f'{cat}\n{val:,.0f} ({pct:.1f}%)'
+                return f'{pct:.1f}%'
+            return label_func
+
+        # Draw pie with labels outside
         wedges, texts, autotexts = ax.pie(
             values,
-            labels=labels,
+            labels=None,  # Don't use built-in labels
             colors=colors,
-            autopct='%1.1f%%' if self.show_values else None,
-            startangle=90
+            autopct=make_label_func(labels, values) if self.show_values else None,
+            startangle=90,
+            pctdistance=1.25,  # Place labels outside the pie
+            labeldistance=1.35
         )
 
-        # Style percentages
+        # Style the percentage/label texts (these are outside the pie)
         if autotexts:
-            for autotext in autotexts:
-                autotext.set_color('white')
-                autotext.set_fontsize(9)
-                autotext.set_weight('bold')
+            for i, autotext in enumerate(autotexts):
+                autotext.set_fontsize(label_fontsize)
+                autotext.set_color('#1F2937')  # Dark text for outside labels
+                autotext.set_weight('normal')
+
+                # Adjust horizontal alignment based on position
+                angle = autotext.get_position()
+                x_pos = autotext.get_position()[0]
+                if x_pos < 0:
+                    autotext.set_horizontalalignment('right')
+                else:
+                    autotext.set_horizontalalignment('left')
+
+        # Add a legend on the right side as backup for small slices
+        if num_slices > 5:
+            # Create legend with category names and values
+            legend_labels = []
+            for i in range(len(labels)):
+                cat = str(labels.iloc[i]) if hasattr(labels, 'iloc') else str(labels[i])
+                val = values.iloc[i] if hasattr(values, 'iloc') else values[i]
+                pct = (val / total) * 100
+                if len(cat) > 15:
+                    cat = cat[:13] + ".."
+                legend_labels.append(f'{cat}: {val:,.0f} ({pct:.1f}%)')
+
+            ax.legend(wedges, legend_labels,
+                     loc='center left',
+                     bbox_to_anchor=(1.0, 0.5),
+                     fontsize=max(6, 8 - num_slices // 4))
 
         ax.axis('equal')
 
@@ -433,7 +485,7 @@ class ChartComponent(BaseComponent):
             columns=self.series_column,
             aggfunc='sum'
         ).fillna(0)  # Fill NaN values from missing combinations
-        df_pivot.plot(kind='barh', stacked=True, ax=ax, color=colors, height=0.7)
+        df_pivot.plot(kind='barh', stacked=True, ax=ax, color=colors)
 
     def _get_colors(self, df: pd.DataFrame) -> List[str]:
         """

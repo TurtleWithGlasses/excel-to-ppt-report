@@ -331,6 +331,26 @@ class PPTGenerator:
             if y_column in computed_column_names:
                 computed_columns.append(y_column)
 
+            # Get chart type
+            chart_type = chart_settings.get('chart_type', 'column')
+
+            # For stacked charts, the y_column may actually be the series column
+            # (what to stack by), and we need to count occurrences
+            series_column = chart_settings.get('series_column')
+            actual_y_column = y_column
+
+            # Check if this is a stacked chart and y_column is categorical (not numeric)
+            if chart_type in ('stacked_bar', 'stacked_column'):
+                # For stacked charts, if y_column is a categorical field, use it as series_column
+                # and use 'Toplam' (count) as the actual y value
+                categorical_columns = ['Medya Tür', 'Mecra Tipi', 'Yayın Tipi', 'Yayın Türü',
+                                       'Duygu', 'Ton', 'Algı', 'Kategori', 'Şehir']
+                if y_column in categorical_columns and not series_column:
+                    series_column = y_column
+                    actual_y_column = 'Toplam'  # Use count
+                    if 'Toplam' not in computed_columns:
+                        computed_columns.append('Toplam')
+
             # Add chart component with ALL settings from the template builder
             component = {
                 'type': 'chart',
@@ -338,7 +358,8 @@ class PPTGenerator:
                 'size': {'width': 9.0, 'height': 5.0 if title else 5.5},
                 'data_source': {
                     'x_column': chart_settings.get('x_column'),
-                    'y_column': y_column,
+                    'y_column': actual_y_column,
+                    'series_column': series_column,  # For stacked charts
                     'calculation': chart_settings.get('calculation', 'sum'),
                     'sort_by': chart_settings.get('sort_by'),
                     'ascending': chart_settings.get('ascending', False),
@@ -346,7 +367,7 @@ class PPTGenerator:
                     'group_by': chart_settings.get('x_column'),  # For chart, group by x column
                     'computed_columns': computed_columns,  # Add computed columns for chart
                 },
-                'chart_type': chart_settings.get('chart_type', 'column'),
+                'chart_type': chart_type,
                 'style': chart_style.copy() if chart_style else {}
             }
             components.append(component)

@@ -2004,115 +2004,170 @@ class TemplateBuilder(QMainWindow):
         
         if not colors:
             colors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
-        
+
+        # Generate sample labels based on x_column selection
+        sample_labels = self._get_sample_labels_for_column(x_column)
+
         # Render chart based on type
         if chart_type == 'pie':
-            self._render_pie_chart_preview(chart_x, chart_y, chart_width, chart_height, colors)
+            self._render_pie_chart_preview(chart_x, chart_y, chart_width, chart_height, colors, sample_labels)
         elif chart_type == 'line':
-            self._render_line_chart_preview(chart_x, chart_y, chart_width, chart_height, colors)
+            self._render_line_chart_preview(chart_x, chart_y, chart_width, chart_height, colors, sample_labels)
         elif chart_type == 'bar':
-            self._render_bar_chart_preview(chart_x, chart_y, chart_width, chart_height, colors)
+            self._render_bar_chart_preview(chart_x, chart_y, chart_width, chart_height, colors, sample_labels)
         elif chart_type in ('stacked_column', 'stacked_bar'):
-            self._render_stacked_chart_preview(chart_x, chart_y, chart_width, chart_height, colors, chart_type)
+            self._render_stacked_chart_preview(chart_x, chart_y, chart_width, chart_height, colors, chart_type, sample_labels)
         else:  # column (default)
-            self._render_column_chart_preview(chart_x, chart_y, chart_width, chart_height, colors)
+            self._render_column_chart_preview(chart_x, chart_y, chart_width, chart_height, colors, sample_labels)
 
-    def _render_column_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
-        """Render column chart preview (vertical bars)"""
-        num_bars = 5
+    def _get_sample_labels_for_column(self, column_name):
+        """Generate sample labels based on the selected X-axis column."""
+        # Common column mappings to realistic sample data
+        sample_data = {
+            'Firma': ['BOSCH', 'BSH', 'ARÇELİK', 'PROFİLO', 'SIEMENS', 'BEKO', 'VESTEL', 'ARZUM'],
+            'Mecra Tipi': ['Basın', 'İnternet', 'Televizyon', 'Radyo', 'Haber Ajansı'],
+            'Yayın Tipi': ['Haber', 'Köşe Yazısı', 'Röportaj', 'Analiz', 'Basın Bülteni'],
+            'Yayın Türü': ['Ulusal', 'Yerel', 'Bölgesel', 'Uluslararası'],
+            'Duygu': ['Pozitif', 'Negatif', 'Nötr'],
+            'Ton': ['Pozitif', 'Negatif', 'Nötr'],
+            'Şehir': ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya', 'Adana'],
+            'Yayın': ['Hürriyet', 'Sabah', 'Milliyet', 'Sözcü', 'Habertürk', 'NTV'],
+            'Kategori': ['Ekonomi', 'Teknoloji', 'Sanayi', 'Finans', 'Enerji'],
+            'Ay': ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran'],
+            'Tarih': ['2024-01', '2024-02', '2024-03', '2024-04', '2024-05', '2024-06'],
+        }
+
+        # Return sample labels for known columns, or generate generic ones
+        if column_name in sample_data:
+            return sample_data[column_name]
+        else:
+            # For unknown columns, generate labels based on column name
+            return [f"{column_name} {i+1}" for i in range(8)]
+
+    def _render_column_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors, sample_labels):
+        """Render column chart preview (vertical bars) - shows ALL labels"""
+        num_bars = len(sample_labels)  # Show ALL labels, no limit
         bar_width = chart_width / (num_bars + 1)
         max_height = chart_height * 0.8
-        
+
+        # Adjust font size based on number of bars
+        value_font_size = max(6, 10 - num_bars // 3)
+        category_font_size = max(5, 9 - num_bars // 3)
+
+        # Sample values (decreasing)
+        sample_values = [100 - i * (80 // max(num_bars, 1)) for i in range(num_bars)]
+
         for i in range(num_bars):
             bar_x = chart_x + (i + 0.5) * bar_width
-            bar_height = max_height * (0.9 - i * 0.15)
+            value = sample_values[i] if i < len(sample_values) else 20
+            bar_height = max_height * (value / 100)
             bar_y = chart_y + chart_height - bar_height
-            
+
             color_index = i % len(colors)
             bar_color = QColor(colors[color_index])
-            
+
             self.preview_scene.addRect(
                 bar_x - bar_width * 0.3, bar_y,
                 bar_width * 0.6, bar_height,
                 bar_color, bar_color
             )
-            
+
             # Value label on top
-            value_text = str(100 - i * 15)
-            value_font = QFont("Calibri", 9)
+            value_text = str(value)
+            value_font = QFont("Calibri", value_font_size)
             value_item = self.preview_scene.addText(value_text, value_font)
             value_item.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_item.boundingRect()
             value_item.setPos(bar_x - value_rect.width() / 2, bar_y - value_rect.height() - 2)
-            
-            # Category label below
-            category_text = f"Item {i + 1}"
-            category_font = QFont("Calibri", 8)
+
+            # Category label below - use actual sample labels
+            category_text = sample_labels[i] if i < len(sample_labels) else f"Item {i+1}"
+            # Truncate if too long
+            max_chars = max(4, int(bar_width / 6))
+            if len(category_text) > max_chars:
+                category_text = category_text[:max_chars-1] + ".."
+            category_font = QFont("Calibri", category_font_size)
             category_item = self.preview_scene.addText(category_text, category_font)
             category_item.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_item.boundingRect()
             category_item.setPos(bar_x - category_rect.width() / 2, chart_y + chart_height + 5)
 
-    def _render_bar_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
-        """Render bar chart preview (horizontal bars)"""
-        num_bars = 5
+    def _render_bar_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors, sample_labels):
+        """Render bar chart preview (horizontal bars) - shows ALL labels"""
+        num_bars = len(sample_labels)  # Show ALL labels, no limit
         bar_height = chart_height / (num_bars + 1)
-        max_width = chart_width * 0.8
-        
+        max_width = chart_width * 0.7
+
+        # Adjust font size based on number of bars
+        value_font_size = max(6, 10 - num_bars // 3)
+        category_font_size = max(6, 9 - num_bars // 3)
+
+        # Sample values (decreasing)
+        sample_values = [100 - i * (80 // max(num_bars, 1)) for i in range(num_bars)]
+
         for i in range(num_bars):
             bar_y_pos = chart_y + (i + 0.5) * bar_height
-            bar_w = max_width * (0.9 - i * 0.15)
-            
+            value = sample_values[i] if i < len(sample_values) else 20
+            bar_w = max_width * (value / 100)
+
             color_index = i % len(colors)
             bar_color = QColor(colors[color_index])
-            
+
             self.preview_scene.addRect(
-                chart_x + 60, bar_y_pos - bar_height * 0.3,
+                chart_x + 80, bar_y_pos - bar_height * 0.3,
                 bar_w, bar_height * 0.6,
                 bar_color, bar_color
             )
-            
+
             # Value label at end
-            value_text = str(100 - i * 15)
-            value_font = QFont("Calibri", 9)
+            value_text = str(value)
+            value_font = QFont("Calibri", value_font_size)
             value_item = self.preview_scene.addText(value_text, value_font)
             value_item.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_item.boundingRect()
-            value_item.setPos(chart_x + 60 + bar_w + 5, bar_y_pos - value_rect.height() / 2)
-            
-            # Category label on left
-            category_text = f"Item {i + 1}"
-            category_font = QFont("Calibri", 8)
+            value_item.setPos(chart_x + 80 + bar_w + 5, bar_y_pos - value_rect.height() / 2)
+
+            # Category label on left - use actual sample labels
+            category_text = sample_labels[i] if i < len(sample_labels) else f"Item {i+1}"
+            # Truncate if too long
+            if len(category_text) > 10:
+                category_text = category_text[:8] + ".."
+            category_font = QFont("Calibri", category_font_size)
             category_item = self.preview_scene.addText(category_text, category_font)
             category_item.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_item.boundingRect()
             category_item.setPos(chart_x, bar_y_pos - category_rect.height() / 2)
 
-    def _render_pie_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
-        """Render pie chart preview"""
+    def _render_pie_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors, sample_labels):
+        """Render pie chart preview with sample labels"""
         import math
-        
+        from PyQt6.QtGui import QPen
+
+        num_slices = len(sample_labels)  # Show ALL slices
+
         # Pie center and radius
         center_x = chart_x + chart_width / 2
         center_y = chart_y + chart_height / 2
-        radius = min(chart_width, chart_height) * 0.4
-        
-        # Sample data for pie slices
-        values = [30, 25, 20, 15, 10]
-        total = sum(values)
+        radius = min(chart_width, chart_height) * 0.35
+
+        # Sample values (decreasing pattern)
+        sample_values = [100 - i * (80 // max(num_slices, 1)) for i in range(num_slices)]
+        total = sum(sample_values)
         start_angle = 0
-        
-        for i, value in enumerate(values):
+
+        # Font size based on number of slices
+        label_font_size = max(6, 9 - num_slices // 3)
+
+        for i in range(num_slices):
+            value = sample_values[i]
+            percentage = (value / total) * 100
+
             # Calculate sweep angle (in 16ths of a degree for Qt)
             sweep_angle = int((value / total) * 360 * 16)
-            
+
             color_index = i % len(colors)
             slice_color = QColor(colors[color_index])
-            
-            # Create ellipse item for pie slice
-            from PyQt6.QtWidgets import QGraphicsEllipseItem
-            from PyQt6.QtGui import QPen
-            
+
             pie_rect = self.preview_scene.addEllipse(
                 center_x - radius, center_y - radius,
                 radius * 2, radius * 2,
@@ -2120,69 +2175,80 @@ class TemplateBuilder(QMainWindow):
             )
             pie_rect.setStartAngle(start_angle)
             pie_rect.setSpanAngle(sweep_angle)
-            
+
             # Calculate label position (middle of slice)
             mid_angle = (start_angle + sweep_angle / 2) / 16.0
-            label_radius = radius * 0.7
+            label_radius = radius * 0.65
             label_x = center_x + label_radius * math.cos(math.radians(mid_angle))
             label_y = center_y - label_radius * math.sin(math.radians(mid_angle))
-            
-            # Value label
-            value_font = QFont("Calibri", 9, QFont.Weight.Bold)
-            value_item = self.preview_scene.addText(f"{value}%", value_font)
-            value_item.setDefaultTextColor(QColor("#FFFFFF"))
-            value_rect = value_item.boundingRect()
-            value_item.setPos(label_x - value_rect.width() / 2, label_y - value_rect.height() / 2)
-            
+
+            # Value label (only show if slice is big enough)
+            if percentage >= 5:
+                value_font = QFont("Calibri", label_font_size, QFont.Weight.Bold)
+                value_item = self.preview_scene.addText(f"{percentage:.0f}%", value_font)
+                value_item.setDefaultTextColor(QColor("#FFFFFF"))
+                value_rect = value_item.boundingRect()
+                value_item.setPos(label_x - value_rect.width() / 2, label_y - value_rect.height() / 2)
+
             start_angle += sweep_angle
-        
-        # Legend
-        legend_x = chart_x + chart_width - 100
+
+        # Legend with actual sample labels
+        legend_x = chart_x + chart_width - 120
         legend_y = chart_y + 10
-        for i, value in enumerate(values):
+        legend_font_size = max(6, 8 - num_slices // 4)
+
+        for i in range(num_slices):
             color_index = i % len(colors)
             legend_color = QColor(colors[color_index])
-            
+
             # Color box
             self.preview_scene.addRect(
-                legend_x, legend_y + i * 18,
-                12, 12,
+                legend_x, legend_y + i * 16,
+                10, 10,
                 legend_color, legend_color
             )
-            
-            # Legend text
-            legend_font = QFont("Calibri", 8)
-            legend_item = self.preview_scene.addText(f"Item {i + 1}", legend_font)
-            legend_item.setDefaultTextColor(QColor("#6B7280"))
-            legend_item.setPos(legend_x + 16, legend_y + i * 18 - 2)
 
-    def _render_line_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
-        """Render line chart preview"""
+            # Legend text - use actual sample labels
+            category_text = sample_labels[i] if i < len(sample_labels) else f"Item {i+1}"
+            if len(category_text) > 12:
+                category_text = category_text[:10] + ".."
+            legend_font = QFont("Calibri", legend_font_size)
+            legend_item = self.preview_scene.addText(category_text, legend_font)
+            legend_item.setDefaultTextColor(QColor("#6B7280"))
+            legend_item.setPos(legend_x + 14, legend_y + i * 16 - 2)
+
+    def _render_line_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors, sample_labels):
+        """Render line chart preview with sample labels"""
         from PyQt6.QtGui import QPen
-        
-        num_points = 5
+
+        num_points = len(sample_labels)  # Show ALL points
         point_spacing = chart_width / (num_points + 1)
         max_height = chart_height * 0.8
-        
-        # Sample data for line
-        values = [100, 85, 70, 55, 40]
-        
+
+        # Sample values (varying pattern)
+        sample_values = [100 - i * (60 // max(num_points, 1)) + (i % 2) * 10 for i in range(num_points)]
+
+        # Font sizes based on number of points
+        value_font_size = max(6, 9 - num_points // 3)
+        category_font_size = max(5, 8 - num_points // 3)
+
         # Draw grid lines
         grid_pen = QPen(QColor("#E5E7EB"), 1)
         for i in range(5):
             y = chart_y + chart_height - (i + 1) * chart_height / 5
             self.preview_scene.addLine(chart_x, y, chart_x + chart_width, y, grid_pen)
-        
+
         # Draw lines connecting points
         line_color = QColor(colors[0])
         line_pen = QPen(line_color, 3)
-        
+
         points = []
-        for i, value in enumerate(values):
+        for i in range(num_points):
+            value = sample_values[i] if i < len(sample_values) else 50
             x = chart_x + (i + 1) * point_spacing
             y = chart_y + chart_height - (value / 100) * max_height
-            points.append((x, y))
-        
+            points.append((x, y, value))
+
         # Draw lines
         for i in range(len(points) - 1):
             self.preview_scene.addLine(
@@ -2190,95 +2256,109 @@ class TemplateBuilder(QMainWindow):
                 points[i + 1][0], points[i + 1][1],
                 line_pen
             )
-        
+
         # Draw points and labels
-        for i, (x, y) in enumerate(points):
+        for i, (x, y, value) in enumerate(points):
             # Point circle
             point_color = QColor(colors[i % len(colors)])
             self.preview_scene.addEllipse(
                 x - 5, y - 5, 10, 10,
                 QPen(point_color, 2), point_color
             )
-            
+
             # Value label
-            value_font = QFont("Calibri", 9)
-            value_item = self.preview_scene.addText(str(values[i]), value_font)
+            value_font = QFont("Calibri", value_font_size)
+            value_item = self.preview_scene.addText(str(value), value_font)
             value_item.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_item.boundingRect()
             value_item.setPos(x - value_rect.width() / 2, y - value_rect.height() - 8)
-            
-            # Category label
-            category_font = QFont("Calibri", 8)
-            category_item = self.preview_scene.addText(f"Item {i + 1}", category_font)
+
+            # Category label - use actual sample labels
+            category_text = sample_labels[i] if i < len(sample_labels) else f"Item {i+1}"
+            # Truncate if too long
+            max_chars = max(4, int(point_spacing / 6))
+            if len(category_text) > max_chars:
+                category_text = category_text[:max_chars-1] + ".."
+            category_font = QFont("Calibri", category_font_size)
+            category_item = self.preview_scene.addText(category_text, category_font)
             category_item.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_item.boundingRect()
             category_item.setPos(x - category_rect.width() / 2, chart_y + chart_height + 5)
 
-    def _render_stacked_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors, chart_type):
-        """Render stacked bar/column chart preview"""
-        num_categories = 4
+    def _render_stacked_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors, chart_type, sample_labels):
+        """Render stacked bar/column chart preview with sample labels"""
+        num_categories = len(sample_labels)  # Show ALL categories
         num_series = 3
-        
+
+        # Font sizes based on number of categories
+        category_font_size = max(5, 8 - num_categories // 3)
+
         if chart_type == 'stacked_column':
             # Stacked column (vertical)
             bar_width = chart_width / (num_categories + 1)
             max_height = chart_height * 0.8
-            
+
             for i in range(num_categories):
                 bar_x = chart_x + (i + 0.5) * bar_width
                 current_y = chart_y + chart_height
-                
+
                 # Stack values (each segment)
                 segment_values = [30, 25, 20]  # Bottom to top
-                total = sum(segment_values)
-                
+
                 for j, value in enumerate(segment_values):
-                    segment_height = (value / 100) * max_height * (1 - i * 0.1)
+                    segment_height = (value / 100) * max_height * (1 - i * 0.05)
                     segment_color = QColor(colors[j % len(colors)])
-                    
+
                     self.preview_scene.addRect(
                         bar_x - bar_width * 0.3, current_y - segment_height,
                         bar_width * 0.6, segment_height,
                         segment_color, segment_color
                     )
                     current_y -= segment_height
-                
-                # Category label
-                category_font = QFont("Calibri", 8)
-                category_item = self.preview_scene.addText(f"Cat {i + 1}", category_font)
+
+                # Category label - use actual sample labels
+                category_text = sample_labels[i] if i < len(sample_labels) else f"Cat {i+1}"
+                max_chars = max(4, int(bar_width / 6))
+                if len(category_text) > max_chars:
+                    category_text = category_text[:max_chars-1] + ".."
+                category_font = QFont("Calibri", category_font_size)
+                category_item = self.preview_scene.addText(category_text, category_font)
                 category_item.setDefaultTextColor(QColor("#6B7280"))
                 category_rect = category_item.boundingRect()
                 category_item.setPos(bar_x - category_rect.width() / 2, chart_y + chart_height + 5)
         else:
             # Stacked bar (horizontal)
             bar_height = chart_height / (num_categories + 1)
-            max_width = chart_width * 0.8
-            
+            max_width = chart_width * 0.7
+
             for i in range(num_categories):
                 bar_y_pos = chart_y + (i + 0.5) * bar_height
-                current_x = chart_x + 60
-                
+                current_x = chart_x + 80
+
                 # Stack values (each segment)
                 segment_values = [30, 25, 20]  # Left to right
-                
+
                 for j, value in enumerate(segment_values):
-                    segment_width = (value / 100) * max_width * (1 - i * 0.1)
+                    segment_width = (value / 100) * max_width * (1 - i * 0.05)
                     segment_color = QColor(colors[j % len(colors)])
-                    
+
                     self.preview_scene.addRect(
                         current_x, bar_y_pos - bar_height * 0.3,
                         segment_width, bar_height * 0.6,
                         segment_color, segment_color
                     )
                     current_x += segment_width
-                
-                # Category label on left
-                category_font = QFont("Calibri", 8)
-                category_item = self.preview_scene.addText(f"Cat {i + 1}", category_font)
+
+                # Category label on left - use actual sample labels
+                category_text = sample_labels[i] if i < len(sample_labels) else f"Cat {i+1}"
+                if len(category_text) > 10:
+                    category_text = category_text[:8] + ".."
+                category_font = QFont("Calibri", category_font_size)
+                category_item = self.preview_scene.addText(category_text, category_font)
                 category_item.setDefaultTextColor(QColor("#6B7280"))
                 category_rect = category_item.boundingRect()
                 category_item.setPos(chart_x, bar_y_pos - category_rect.height() / 2)
-        
+
         # Legend for stacked charts
         legend_x = chart_x + chart_width - 100
         legend_y = chart_y + 10

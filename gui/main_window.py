@@ -1000,8 +1000,20 @@ class MainWindow(QMainWindow):
         colors = chart_style.get('colors', ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'])
 
         # Render chart based on type
-        if chart_data is not None and not chart_data.empty:
-            self._draw_data_chart(chart_data, chart_type, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+        # Check if chart_data is a dict (stacked chart) or DataFrame (regular chart)
+        if chart_data is not None:
+            if isinstance(chart_data, dict) and chart_data.get('is_stacked'):
+                # Stacked chart data - pass the whole dict
+                df_pivot = chart_data.get('df_pivot')
+                if df_pivot is not None and not df_pivot.empty:
+                    self._draw_data_chart(chart_data, chart_type, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+                else:
+                    self._draw_placeholder_chart(chart_type, chart_x, chart_y, chart_width, chart_height, colors)
+            elif hasattr(chart_data, 'empty') and not chart_data.empty:
+                # Regular DataFrame
+                self._draw_data_chart(chart_data, chart_type, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+            else:
+                self._draw_placeholder_chart(chart_type, chart_x, chart_y, chart_width, chart_height, colors)
         else:
             # Render placeholder chart
             self._draw_placeholder_chart(chart_type, chart_x, chart_y, chart_width, chart_height, colors)
@@ -1036,8 +1048,8 @@ class MainWindow(QMainWindow):
             # Get column mapping
             columns = table_settings.get('columns', [])
             if not columns:
-                # Use all columns if not specified
-                return df_source.head(10)
+                # Use all columns if not specified (no limit)
+                return df_source
 
             # Define computed column names that need to be calculated
             computed_column_names = ['Toplam', 'Pozitif', 'Negatif', 'Nötr', 'YÜKSEK', 'ORTA', 'DÜŞÜK',
@@ -1081,7 +1093,7 @@ class MainWindow(QMainWindow):
 
             if not selected_columns and not computed_columns_needed:
                 logger.debug("No valid columns found in table configuration")
-                return df_source.head(10)
+                return df_source  # Return all data (no limit)
 
             # Check if we need to group data (look for "Firma" or similar grouping column)
             group_by_config = table_settings.get('group_by')
@@ -1129,8 +1141,8 @@ class MainWindow(QMainWindow):
                 # No grouping, just select the columns
                 df = df_source[selected_columns].copy()
             else:
-                # No valid columns found
-                df = df_source.head(10)
+                # No valid columns found - return all data (no limit)
+                df = df_source.copy()
 
             # Apply sorting if specified
             sort_by_config = table_settings.get('sort_by')
@@ -1190,6 +1202,7 @@ class MainWindow(QMainWindow):
         try:
             x_column_config = chart_settings.get('x_column')
             y_column_config = chart_settings.get('y_column')
+            chart_type = chart_settings.get('chart_type', 'column')
 
             if not x_column_config or not y_column_config:
                 logger.debug(f"Missing column config: x_column={x_column_config}, y_column={y_column_config}")
@@ -1210,9 +1223,25 @@ class MainWindow(QMainWindow):
             # Define computed column names that need to be calculated
             computed_column_names = ['Toplam', 'Pozitif', 'Negatif', 'Nötr', 'YÜKSEK', 'ORTA', 'DÜŞÜK',
                                      'Basın', 'Radyo', 'Televizyon', 'İnternet', 'Ulusal', 'Yerel']
+            
+            # Define categorical columns that should be used as series for stacked charts
+            categorical_columns = ['Medya Tür', 'Mecra Tipi', 'Yayın Tipi', 'Yayın Türü', 'Mecra',
+                                   'Duygu', 'Ton', 'Algı', 'Kategori', 'Şehir', 'Medya Kapsam']
 
             # Check if y_column is a computed column
             is_computed_column = y_column_config in computed_column_names
+            
+            # Handle stacked charts specially
+            if chart_type in ('stacked_bar', 'stacked_column'):
+                # Find if y_column is a categorical column (for series)
+                y_column = self._find_column(df_source, y_column_config)
+                is_categorical = y_column_config in categorical_columns or (
+                    y_column and not pd.api.types.is_numeric_dtype(df_source[y_column])
+                )
+                
+                if is_categorical and y_column:
+                    # Use y_column as series column and create pivoted data
+                    return self._get_stacked_chart_data(df_source, x_column, y_column, chart_settings)
             
             # Special case: if x_column and y_column are the same, use count (like Toplam)
             if x_column_config == y_column_config:
@@ -1290,12 +1319,11 @@ class MainWindow(QMainWindow):
                     # Default to sorting by Y values
                     df = df.sort_values(by=y_column, ascending=ascending)
 
-            # Apply top_n
+            # Apply top_n only if specified (no default limit - show all)
             top_n = chart_settings.get('top_n')
             if top_n and top_n > 0:
                 df = df.head(top_n)
-            else:
-                df = df.head(10)
+            # If no top_n specified, show all data (no limit)
 
             logger.debug(f"Chart data extracted: {len(df)} rows")
             return df
@@ -1379,6 +1407,63 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             logger.warning(f"Error calculating computed column '{computed_column_name}': {e}")
+            return None
+
+    def _get_stacked_chart_data(self, df_source, x_column, series_column, chart_settings):
+        """
+        Get data for stacked charts (stacked_bar, stacked_column).
+        Returns a dict with pivoted DataFrame and metadata.
+        
+        Args:
+            df_source: Source DataFrame
+            x_column: Column for X-axis categories
+            series_column: Column for series (stacking)
+            chart_settings: Chart configuration
+        
+        Returns:
+            dict with 'df_pivot' (pivoted DataFrame), 'x_column', 'series_column', 'is_stacked'
+        """
+        try:
+            # Use crosstab to count occurrences - rows = x_column, columns = series_column
+            df_pivot = pd.crosstab(
+                index=df_source[x_column],
+                columns=df_source[series_column]
+            ).fillna(0)
+            
+            # Apply sorting
+            sort_by = chart_settings.get('sort_by')
+            ascending = chart_settings.get('ascending', True)
+            
+            # Calculate total for sorting
+            df_pivot['__total__'] = df_pivot.sum(axis=1)
+            
+            if sort_by == 'y' or not sort_by:
+                # Sort by total (descending by default for charts)
+                df_pivot = df_pivot.sort_values(by='__total__', ascending=ascending)
+            else:
+                # Sort by x (category name)
+                df_pivot = df_pivot.sort_index(ascending=ascending)
+            
+            # Remove the total column used for sorting
+            df_pivot = df_pivot.drop(columns=['__total__'])
+            
+            # Apply top_n only if specified (no default limit - show all)
+            top_n = chart_settings.get('top_n')
+            if top_n and top_n > 0:
+                df_pivot = df_pivot.head(top_n)
+            # If no top_n specified, show all data (no limit)
+            
+            logger.debug(f"Stacked chart data: {len(df_pivot)} rows, {len(df_pivot.columns)} series")
+            
+            return {
+                'df_pivot': df_pivot,
+                'x_column': x_column,
+                'series_column': series_column,
+                'is_stacked': True
+            }
+            
+        except Exception as e:
+            logger.warning(f"Error creating stacked chart data: {e}")
             return None
 
     def _add_computed_columns_to_table(self, df_source, df_grouped, group_by, computed_columns):
@@ -1627,8 +1712,8 @@ class MainWindow(QMainWindow):
             self._draw_placeholder_chart(chart_type, chart_x, chart_y, chart_width, chart_height, colors)
 
     def _draw_column_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw column chart with real data"""
-        num_bars = min(len(df), 10)
+        """Draw column chart with real data - no limit on number of bars"""
+        num_bars = len(df)  # Show ALL data points
         if num_bars == 0:
             return
 
@@ -1639,6 +1724,10 @@ class MainWindow(QMainWindow):
         max_val = df[y_col].max()
         if max_val == 0:
             max_val = 1
+
+        # Adjust font size based on number of bars
+        value_font_size = max(6, 10 - num_bars // 5)
+        category_font_size = max(5, 8 - num_bars // 5)
 
         for i in range(num_bars):
             bar_x = chart_x + (i + 0.5) * bar_width
@@ -1656,7 +1745,7 @@ class MainWindow(QMainWindow):
             )
 
             # Value label
-            value_font = QFont("Calibri", 8)
+            value_font = QFont("Calibri", value_font_size)
             value_text = self.slide_scene.addText(f"{value:,.0f}" if value >= 1 else f"{value:.2f}", value_font)
             value_text.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_text.boundingRect()
@@ -1665,17 +1754,19 @@ class MainWindow(QMainWindow):
             # Category label
             x_col = df.columns[0]
             category = str(df.iloc[i][x_col])
-            if len(category) > 10:
-                category = category[:8] + ".."
-            category_font = QFont("Calibri", 7)
+            # Truncate based on available space
+            max_chars = max(4, int(bar_width / 6))
+            if len(category) > max_chars:
+                category = category[:max_chars-2] + ".."
+            category_font = QFont("Calibri", category_font_size)
             category_text = self.slide_scene.addText(category, category_font)
             category_text.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_text.boundingRect()
             category_text.setPos(bar_x - category_rect.width() / 2, chart_y + chart_height + 5)
 
     def _draw_bar_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw horizontal bar chart with real data"""
-        num_bars = min(len(df), 8)
+        """Draw horizontal bar chart with real data - no limit on number of bars"""
+        num_bars = len(df)  # Show ALL data points
         if num_bars == 0:
             return
 
@@ -1687,83 +1778,156 @@ class MainWindow(QMainWindow):
         if max_val == 0:
             max_val = 1
 
+        # Adjust font size based on number of bars
+        value_font_size = max(6, 10 - num_bars // 5)
+        category_font_size = max(6, 9 - num_bars // 5)
+
         for i in range(num_bars):
             bar_y = chart_y + (i + 0.5) * bar_height
             value = df.iloc[i][y_col]
-            bar_width = (value / max_val) * chart_width * 0.7
+            actual_bar_width = (value / max_val) * chart_width * 0.7
 
             color_index = i % len(colors)
             bar_color = QColor(colors[color_index])
 
             self.slide_scene.addRect(
                 chart_x + 100, bar_y - bar_height * 0.3,
-                bar_width, bar_height * 0.6,
+                actual_bar_width, bar_height * 0.6,
                 bar_color, bar_color
             )
 
             # Value label
-            value_font = QFont("Calibri", 8)
+            value_font = QFont("Calibri", value_font_size)
             value_text = self.slide_scene.addText(f"{value:,.0f}" if value >= 1 else f"{value:.2f}", value_font)
             value_text.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_text.boundingRect()
-            value_text.setPos(chart_x + 100 + bar_width + 5, bar_y - value_rect.height() / 2)
+            value_text.setPos(chart_x + 100 + actual_bar_width + 5, bar_y - value_rect.height() / 2)
 
             # Category label
             x_col = df.columns[0]
             category = str(df.iloc[i][x_col])
             if len(category) > 12:
                 category = category[:10] + ".."
-            category_font = QFont("Calibri", 8)
+            category_font = QFont("Calibri", category_font_size)
             category_text = self.slide_scene.addText(category, category_font)
             category_text.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_text.boundingRect()
             category_text.setPos(chart_x + 10, bar_y - category_rect.height() / 2)
 
     def _draw_pie_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw pie chart with real data"""
-        num_slices = min(len(df), 8)
+        """Draw pie chart with real data and labels outside the pie"""
+        import math
+        num_slices = len(df)  # Show ALL slices
         if num_slices == 0:
             return
 
-        center_x = chart_x + chart_width / 2
+        # Position pie to the left to make room for legend
+        pie_center_x = chart_x + chart_width * 0.35
         center_y = chart_y + chart_height / 2
-        radius = min(chart_width, chart_height) * 0.35
+        radius = min(chart_width * 0.5, chart_height) * 0.35
+        label_radius = radius * 1.35  # Radius for label positioning
 
         # Get values
+        x_col = df.columns[0]
         y_col = df.columns[1]
         total = df[y_col].sum()
         if total == 0:
             return
 
+        from PyQt6.QtCore import QRectF
+
+        # Adjust font size based on number of slices
+        label_font_size = max(6, 9 - num_slices // 4)
+        legend_font_size = max(6, 8 - num_slices // 4)
+
         # Draw slices
-        start_angle = 0
+        start_angle = 90  # Start from top (12 o'clock position)
         for i in range(num_slices):
             value = df.iloc[i][y_col]
+            category = str(df.iloc[i][x_col])
+            percentage = (value / total) * 100
             angle = (value / total) * 360
 
             color_index = i % len(colors)
             slice_color = QColor(colors[color_index])
 
-            from PyQt6.QtCore import QRectF
-            rect = QRectF(center_x - radius, center_y - radius, radius * 2, radius * 2)
+            rect = QRectF(pie_center_x - radius, center_y - radius, radius * 2, radius * 2)
             path = QPainterPath()
-            path.moveTo(center_x, center_y)
-            path.arcTo(rect, start_angle, angle)
+            path.moveTo(pie_center_x, center_y)
+            path.arcTo(rect, start_angle, -angle)  # Negative angle for clockwise
             path.closeSubpath()
 
             self.slide_scene.addPath(path, slice_color, slice_color)
 
-            start_angle += angle
+            # Calculate label position at middle of slice - only for significant slices
+            if percentage >= 5:
+                mid_angle = start_angle - angle / 2
+                mid_angle_rad = math.radians(mid_angle)
+                label_x = pie_center_x + label_radius * math.cos(mid_angle_rad)
+                label_y = center_y - label_radius * math.sin(mid_angle_rad)
+
+                # Truncate category name
+                if len(category) > 10:
+                    category = category[:8] + ".."
+
+                # Create label text
+                label_text = f"{category}\n{value:,.0f} ({percentage:.1f}%)"
+
+                label_font = QFont("Calibri", label_font_size)
+                label_item = self.slide_scene.addText(label_text, label_font)
+                label_item.setDefaultTextColor(QColor("#1F2937"))
+                label_rect = label_item.boundingRect()
+
+                # Adjust position based on which side of the pie
+                if mid_angle_rad >= -math.pi/2 and mid_angle_rad <= math.pi/2:
+                    # Right side
+                    label_item.setPos(label_x, label_y - label_rect.height() / 2)
+                else:
+                    # Left side
+                    label_item.setPos(label_x - label_rect.width(), label_y - label_rect.height() / 2)
+
+            start_angle -= angle  # Move to next slice (clockwise)
+
+        # Add legend on the right side showing ALL items
+        legend_x = chart_x + chart_width * 0.65
+        legend_y = chart_y + 20
+        legend_item_height = max(14, chart_height / (num_slices + 2))
+
+        for i in range(num_slices):
+            value = df.iloc[i][y_col]
+            category = str(df.iloc[i][x_col])
+            percentage = (value / total) * 100
+
+            color_index = i % len(colors)
+            legend_color = QColor(colors[color_index])
+
+            # Color box
+            box_y = legend_y + i * legend_item_height
+            self.slide_scene.addRect(
+                legend_x, box_y,
+                10, 10,
+                legend_color, legend_color
+            )
+
+            # Legend text
+            if len(category) > 12:
+                category = category[:10] + ".."
+            legend_text = f"{category}: {value:,.0f} ({percentage:.1f}%)"
+            legend_font = QFont("Calibri", legend_font_size)
+            legend_item = self.slide_scene.addText(legend_text, legend_font)
+            legend_item.setDefaultTextColor(QColor("#4B5563"))
+            legend_item.setPos(legend_x + 14, box_y - 2)
 
     def _draw_line_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw line chart with real data"""
-        num_points = min(len(df), 10)
+        """Draw line chart with real data and labels"""
+        num_points = len(df)  # Show ALL data points
         if num_points == 0:
             return
 
         point_spacing = chart_width / (num_points + 1)
 
-        # Get max value for scaling
+        # Get values
+        x_col = df.columns[0]
         y_col = df.columns[1]
         max_val = df[y_col].max()
         min_val = df[y_col].min()
@@ -1772,6 +1936,10 @@ class MainWindow(QMainWindow):
 
         pen = QPen(QColor(colors[0]))
         pen.setWidth(3)
+
+        # Adjust font size based on number of points
+        value_font_size = max(6, 9 - num_points // 5)
+        category_font_size = max(5, 8 - num_points // 5)
 
         # Draw lines and points
         for i in range(num_points - 1):
@@ -1789,19 +1957,189 @@ class MainWindow(QMainWindow):
             # Draw point
             self.slide_scene.addEllipse(x1 - 4, y1 - 4, 8, 8, pen, QColor(colors[0]))
 
-        # Draw last point
+            # Value label above point
+            value_font = QFont("Calibri", value_font_size)
+            value_text = self.slide_scene.addText(f"{value1:,.0f}" if value1 >= 1 else f"{value1:.2f}", value_font)
+            value_text.setDefaultTextColor(QColor("#1F2937"))
+            value_rect = value_text.boundingRect()
+            value_text.setPos(x1 - value_rect.width() / 2, y1 - value_rect.height() - 8)
+
+            # Category label below
+            category = str(df.iloc[i][x_col])
+            max_chars = max(4, int(point_spacing / 6))
+            if len(category) > max_chars:
+                category = category[:max_chars-2] + ".."
+            category_font = QFont("Calibri", category_font_size)
+            category_text = self.slide_scene.addText(category, category_font)
+            category_text.setDefaultTextColor(QColor("#6B7280"))
+            category_rect = category_text.boundingRect()
+            category_text.setPos(x1 - category_rect.width() / 2, chart_y + chart_height + 5)
+
+        # Draw last point with labels
         x_last = chart_x + num_points * point_spacing
         value_last = df.iloc[num_points - 1][y_col]
         y_last = chart_y + chart_height - ((value_last - min_val) / (max_val - min_val)) * chart_height * 0.8
         self.slide_scene.addEllipse(x_last - 4, y_last - 4, 8, 8, pen, QColor(colors[0]))
 
-    def _draw_stacked_column_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw stacked column chart (simplified - uses same as column for now)"""
-        self._draw_column_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+        # Last value label
+        value_font = QFont("Calibri", value_font_size)
+        value_text = self.slide_scene.addText(f"{value_last:,.0f}" if value_last >= 1 else f"{value_last:.2f}", value_font)
+        value_text.setDefaultTextColor(QColor("#1F2937"))
+        value_rect = value_text.boundingRect()
+        value_text.setPos(x_last - value_rect.width() / 2, y_last - value_rect.height() - 8)
 
-    def _draw_stacked_bar_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw stacked bar chart (simplified - uses same as bar for now)"""
-        self._draw_bar_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+        # Last category label
+        category = str(df.iloc[num_points - 1][x_col])
+        max_chars = max(4, int(point_spacing / 6))
+        if len(category) > max_chars:
+            category = category[:max_chars-2] + ".."
+        category_font = QFont("Calibri", category_font_size)
+        category_text = self.slide_scene.addText(category, category_font)
+        category_text.setDefaultTextColor(QColor("#6B7280"))
+        category_rect = category_text.boundingRect()
+        category_text.setPos(x_last - category_rect.width() / 2, chart_y + chart_height + 5)
+
+    def _draw_stacked_column_chart_with_data(self, data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
+        """Draw stacked column chart with real data"""
+        # Check if data is stacked format (dict with df_pivot) or regular DataFrame
+        if isinstance(data, dict) and data.get('is_stacked'):
+            df_pivot = data.get('df_pivot')
+            if df_pivot is None or df_pivot.empty:
+                return
+            
+            num_bars = len(df_pivot)
+            if num_bars == 0:
+                return
+            
+            bar_width = chart_width / (num_bars + 1)
+            
+            # Get max stacked value for scaling
+            max_val = df_pivot.sum(axis=1).max()
+            if max_val == 0:
+                max_val = 1
+            
+            # Adjust font size based on number of bars
+            category_font_size = max(5, 8 - num_bars // 5)
+            
+            for i, (category, row) in enumerate(df_pivot.iterrows()):
+                bar_x = chart_x + (i + 0.5) * bar_width
+                cumulative_height = 0
+                
+                for j, (series_name, value) in enumerate(row.items()):
+                    if value <= 0:
+                        continue
+                    
+                    segment_height = (value / max_val) * chart_height * 0.8
+                    bar_y = chart_y + chart_height - cumulative_height - segment_height
+                    
+                    color = QColor(colors[j % len(colors)])
+                    self.slide_scene.addRect(
+                        bar_x, bar_y,
+                        bar_width * 0.8, segment_height,
+                        color, color
+                    )
+                    
+                    cumulative_height += segment_height
+                
+                # Category label
+                category_text = self.slide_scene.addText(str(category)[:10], QFont("Calibri", category_font_size))
+                category_text.setDefaultTextColor(QColor("#374151"))
+                category_rect = category_text.boundingRect()
+                category_text.setPos(bar_x + bar_width * 0.4 - category_rect.width() / 2, chart_y + chart_height + 5)
+            
+            # Draw legend
+            self._draw_stacked_legend(df_pivot.columns.tolist(), colors, chart_x, chart_y, chart_width)
+        else:
+            # Fallback to regular column chart
+            self._draw_column_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+
+    def _draw_stacked_bar_chart_with_data(self, data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
+        """Draw stacked horizontal bar chart with real data"""
+        # Check if data is stacked format (dict with df_pivot) or regular DataFrame
+        if isinstance(data, dict) and data.get('is_stacked'):
+            df_pivot = data.get('df_pivot')
+            if df_pivot is None or df_pivot.empty:
+                return
+            
+            num_bars = len(df_pivot)
+            if num_bars == 0:
+                return
+            
+            bar_height = chart_height / (num_bars + 1)
+            
+            # Get max stacked value for scaling
+            max_val = df_pivot.sum(axis=1).max()
+            if max_val == 0:
+                max_val = 1
+            
+            # Adjust font sizes based on number of bars
+            value_font_size = max(6, 10 - num_bars // 5)
+            category_font_size = max(5, 8 - num_bars // 5)
+            
+            # Calculate label width for offset
+            label_width = 80  # Reserve space for category labels
+            available_width = chart_width - label_width
+            
+            for i, (category, row) in enumerate(df_pivot.iterrows()):
+                bar_y = chart_y + (i + 0.5) * bar_height
+                cumulative_width = 0
+                
+                for j, (series_name, value) in enumerate(row.items()):
+                    if value <= 0:
+                        continue
+                    
+                    segment_width = (value / max_val) * available_width * 0.9
+                    bar_x = chart_x + label_width + cumulative_width
+                    
+                    color = QColor(colors[j % len(colors)])
+                    self.slide_scene.addRect(
+                        bar_x, bar_y,
+                        segment_width, bar_height * 0.7,
+                        color, color
+                    )
+                    
+                    # Value label inside segment if it fits
+                    if segment_width > 30:
+                        val_text = self.slide_scene.addText(str(int(value)), QFont("Calibri", value_font_size))
+                        val_text.setDefaultTextColor(QColor("#FFFFFF"))
+                        val_rect = val_text.boundingRect()
+                        val_text.setPos(
+                            bar_x + segment_width / 2 - val_rect.width() / 2,
+                            bar_y + bar_height * 0.35 - val_rect.height() / 2
+                        )
+                    
+                    cumulative_width += segment_width
+                
+                # Category label on the left
+                category_text = self.slide_scene.addText(str(category)[:12], QFont("Calibri", category_font_size))
+                category_text.setDefaultTextColor(QColor("#374151"))
+                category_rect = category_text.boundingRect()
+                category_text.setPos(chart_x + label_width - category_rect.width() - 5, bar_y + bar_height * 0.35 - category_rect.height() / 2)
+            
+            # Draw legend at the top right
+            self._draw_stacked_legend(df_pivot.columns.tolist(), colors, chart_x, chart_y, chart_width)
+        else:
+            # Fallback to regular bar chart
+            self._draw_bar_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+
+    def _draw_stacked_legend(self, series_names, colors, chart_x, chart_y, chart_width):
+        """Draw legend for stacked charts"""
+        legend_x = chart_x + chart_width - 150
+        legend_y = chart_y + 10
+        
+        for i, name in enumerate(series_names[:6]):  # Max 6 series in legend
+            # Legend color box
+            color = QColor(colors[i % len(colors)])
+            self.slide_scene.addRect(
+                legend_x, legend_y + i * 18,
+                12, 12,
+                color, color
+            )
+            
+            # Legend text
+            legend_text = self.slide_scene.addText(str(name)[:15], QFont("Calibri", 8))
+            legend_text.setDefaultTextColor(QColor("#374151"))
+            legend_text.setPos(legend_x + 16, legend_y + i * 18 - 2)
 
     def _draw_placeholder_chart(self, chart_type, chart_x, chart_y, chart_width, chart_height, colors):
         """Draw placeholder chart when no data available"""

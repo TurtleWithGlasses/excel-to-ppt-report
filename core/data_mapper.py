@@ -232,13 +232,20 @@ class DataMapper:
 
         df = self._normalize_columns(self.data)
 
+        # Check for series_column (used in stacked charts)
+        series_column_config = data_source.get('series_column')
+        series_column = self._find_column(df, series_column_config) if series_column_config else None
+
         # Apply group_by aggregation if specified
         group_by_config = data_source.get('group_by')
         group_by = self._find_column(df, group_by_config) if group_by_config else None
         aggregations = data_source.get('aggregations', {})
         computed_columns = data_source.get('computed_columns', [])
 
-        if group_by and group_by in df.columns:
+        # For stacked charts with series_column, aggregate by both group_by and series_column
+        if series_column and series_column in df.columns and group_by and group_by in df.columns:
+            df = self._aggregate_for_stacked_chart(df, group_by, series_column, data_source)
+        elif group_by and group_by in df.columns:
             # Build aggregation with computed columns
             df = self._aggregate_with_computed_columns(df, group_by, computed_columns, aggregations)
 
@@ -271,6 +278,48 @@ class DataMapper:
             df = df.head(top_n)
 
         return df
+
+    def _aggregate_for_stacked_chart(
+        self,
+        df: pd.DataFrame,
+        group_by: str,
+        series_column: str,
+        data_source: Dict[str, Any]
+    ) -> pd.DataFrame:
+        """
+        Aggregate data for stacked charts.
+
+        Groups by both group_by column and series_column, counting occurrences.
+        This creates data suitable for stacked bar/column charts.
+
+        Args:
+            df: Source DataFrame
+            group_by: Primary grouping column (x-axis categories)
+            series_column: Series column (what to stack by)
+            data_source: Additional data source configuration
+
+        Returns:
+            DataFrame with columns: [group_by, series_column, count/value]
+        """
+        # Get the y_column (value to aggregate)
+        y_column = data_source.get('y_column', 'Toplam')
+        calculation = data_source.get('calculation', 'count')
+
+        # Group by both columns and count/sum
+        if calculation == 'count' or y_column == 'Toplam':
+            # Count occurrences
+            result = df.groupby([group_by, series_column]).size().reset_index(name='Toplam')
+            result = result.rename(columns={'Toplam': y_column})
+        else:
+            # Sum or other aggregation on a numeric column
+            y_col_actual = self._find_column(df, y_column)
+            if y_col_actual and y_col_actual in df.columns:
+                result = df.groupby([group_by, series_column])[y_col_actual].sum().reset_index()
+            else:
+                # Fallback to count
+                result = df.groupby([group_by, series_column]).size().reset_index(name=y_column)
+
+        return result
 
     def _aggregate_with_computed_columns(
         self,
