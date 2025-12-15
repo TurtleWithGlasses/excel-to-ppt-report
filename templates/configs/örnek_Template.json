@@ -5,8 +5,8 @@
     "industry": "Fashion & Retail",
     "author": "ReportForge Template Builder",
     "version": "1.0",
-    "created_date": "2025-12-06",
-    "modified_date": "2025-12-06"
+    "created_date": "2025-12-14",
+    "modified_date": "2025-12-14"
   },
   "settings": {
     "page_size": "16:9",
@@ -43,47 +43,43 @@
       "title": "Örnek",
       "subtitle": "",
       "columns": [
-        "Firma",
         "Kurum",
         "Toplam",
-        "Pozitif",
-        "Negatif",
         "Erişim",
         "StxCm",
         "Reklam Eşdeğeri",
-        "Net Etki",
-        "Medya Kapsam"
+        "Net Etki"
       ],
-      "sort_by": null,
-      "ascending": true,
-      "group_by": null,
+      "sort_by": "Toplam",
+      "ascending": false,
+      "group_by": "Firma",
       "note": "",
       "style": {
         "font_name": "Calibri",
         "font_size": 11,
-        "header_color": "#AA007F",
-        "header_text_color": "#AA557F",
+        "header_color": "#550000",
+        "header_text_color": "#00FF00",
         "row_color_1": "#000000",
-        "row_color_2": "#000000",
-        "text_color": "#55AA00",
-        "background_color": "#5555FF",
+        "row_color_2": "#BABABA",
+        "text_color": "#AA0000",
+        "background_color": "#0000FF",
         "header_alignment": "Center",
         "text_alignment": "Center",
         "header_bold": true,
         "header_italic": false,
         "text_bold": true,
-        "text_italic": false,
-        "border_color": "#00AAFF"
+        "text_italic": true,
+        "border_color": "#FFFFFF"
       }
     },
     "chart_slide": {
-      "chart_type": "column",
+      "chart_type": "stacked_bar",
       "title": "",
       "x_column": "Firma",
-      "y_column": "Net Etki",
+      "y_column": "Erişim",
       "calculation": "sum",
       "sort_by": null,
-      "ascending": false,
+      "ascending": true,
       "top_n": null,
       "style": {
         "colors": [
@@ -91,11 +87,18 @@
           "#10B981",
           "#F59E0B",
           "#EF4444",
-          "#8B5CF6"
+          "#8B5CF6",
+          "#06B6D4",
+          "#EC4899",
+          "#84CC16"
         ],
         "show_values": true,
         "grid": true,
-        "legend_position": "none"
+        "legend_position": "none",
+        "font_name": "Calibri",
+        "font_size": 11,
+        "x_label": "",
+        "y_label": ""
       }
     },
     "color_scheme": {
@@ -150,37 +153,33 @@
           "title": "Örnek",
           "subtitle": "",
           "columns": [
-            "Firma",
             "Kurum",
             "Toplam",
-            "Pozitif",
-            "Negatif",
             "Erişim",
             "StxCm",
             "Reklam Eşdeğeri",
-            "Net Etki",
-            "Medya Kapsam"
+            "Net Etki"
           ],
-          "sort_by": null,
-          "ascending": true,
-          "group_by": null,
+          "sort_by": "Toplam",
+          "ascending": false,
+          "group_by": "Firma",
           "note": "",
           "style": {
             "font_name": "Calibri",
             "font_size": 11,
-            "header_color": "#AA007F",
-            "header_text_color": "#AA557F",
+            "header_color": "#550000",
+            "header_text_color": "#00FF00",
             "row_color_1": "#000000",
-            "row_color_2": "#000000",
-            "text_color": "#55AA00",
-            "background_color": "#5555FF",
+            "row_color_2": "#BABABA",
+            "text_color": "#AA0000",
+            "background_color": "#0000FF",
             "header_alignment": "Center",
             "text_alignment": "Center",
             "header_bold": true,
             "header_italic": false,
             "text_bold": true,
-            "text_italic": false,
-            "border_color": "#00AAFF"
+            "text_italic": true,
+            "border_color": "#FFFFFF"
           }
         }
       }
@@ -194,7 +193,43 @@
           "chart_type": "column",
           "title": "",
           "x_column": "Firma",
-          "y_column": "Net Etki",
+          "y_column": "Firma",
+          "calculation": "sum",
+          "sort_by": null,
+          "ascending": true,
+          "top_n": null,
+          "style": {
+            "colors": [
+              "#2563EB",
+              "#10B981",
+              "#F59E0B",
+              "#EF4444",
+              "#8B5CF6",
+              "#06B6D4",
+              "#EC4899",
+              "#84CC16"
+            ],
+            "show_values": true,
+            "grid": true,
+            "legend_position": "none",
+            "font_name": "Calibri",
+            "font_size": 11,
+            "x_label": "",
+            "y_label": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "grafik2",
+      "type": "Chart Slide",
+      "components": [],
+      "slide_settings": {
+        "chart": {
+          "chart_type": "bar",
+          "title": "",
+          "x_column": "Firma",
+          "y_column": "Firma",
           "calculation": "sum",
           "sort_by": null,
           "ascending": false,
@@ -205,11 +240,126 @@
               "#10B981",
               "#F59E0B",
               "#EF4444",
-              "#8B5CF6"
+              "#8B5CF6",
+              "#06B6D4",
+              "#EC4899",
+              "#84CC16"
             ],
             "show_values": true,
             "grid": true,
-            "legend_position": "none"
+            "legend_position": "none",
+            "font_name": "Calibri",
+            "font_size": 11,
+            "x_label": "",
+            "y_label": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "grafik3",
+      "type": "Chart Slide",
+      "components": [],
+      "slide_settings": {
+        "chart": {
+          "chart_type": "pie",
+          "title": "",
+          "x_column": "Firma",
+          "y_column": "Firma",
+          "calculation": "sum",
+          "sort_by": null,
+          "ascending": true,
+          "top_n": null,
+          "style": {
+            "colors": [
+              "#2563EB",
+              "#10B981",
+              "#F59E0B",
+              "#EF4444",
+              "#8B5CF6",
+              "#06B6D4",
+              "#EC4899",
+              "#84CC16"
+            ],
+            "show_values": true,
+            "grid": true,
+            "legend_position": "none",
+            "font_name": "Calibri",
+            "font_size": 11,
+            "x_label": "",
+            "y_label": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "grafik4",
+      "type": "Chart Slide",
+      "components": [],
+      "slide_settings": {
+        "chart": {
+          "chart_type": "line",
+          "title": "",
+          "x_column": "Firma",
+          "y_column": "Firma",
+          "calculation": "sum",
+          "sort_by": null,
+          "ascending": true,
+          "top_n": null,
+          "style": {
+            "colors": [
+              "#2563EB",
+              "#10B981",
+              "#F59E0B",
+              "#EF4444",
+              "#8B5CF6",
+              "#06B6D4",
+              "#EC4899",
+              "#84CC16"
+            ],
+            "show_values": true,
+            "grid": true,
+            "legend_position": "none",
+            "font_name": "Calibri",
+            "font_size": 11,
+            "x_label": "",
+            "y_label": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "grafik5",
+      "type": "Chart Slide",
+      "components": [],
+      "slide_settings": {
+        "chart": {
+          "chart_type": "stacked_bar",
+          "title": "",
+          "x_column": "Firma",
+          "y_column": "Erişim",
+          "calculation": "sum",
+          "sort_by": null,
+          "ascending": true,
+          "top_n": null,
+          "style": {
+            "colors": [
+              "#2563EB",
+              "#10B981",
+              "#F59E0B",
+              "#EF4444",
+              "#8B5CF6",
+              "#06B6D4",
+              "#EC4899",
+              "#84CC16"
+            ],
+            "show_values": true,
+            "grid": true,
+            "legend_position": "none",
+            "font_name": "Calibri",
+            "font_size": 11,
+            "x_label": "",
+            "y_label": ""
           }
         }
       }

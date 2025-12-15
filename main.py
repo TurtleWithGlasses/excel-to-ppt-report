@@ -5,11 +5,14 @@ Universal PowerPoint Report Generation System
 Usage:
     python main.py              # Launch Main App (Report Generator)
     python main.py --builder    # Launch Template Builder
+    python main.py --debug      # Launch with debug logging
 """
 
 import sys
 # Disable bytecode caching to always use latest code
 sys.dont_write_bytecode = True
+
+import logging
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
@@ -19,6 +22,19 @@ from gui.template_builder import TemplateBuilder
 
 def main():
     """Main application entry point"""
+    # Configure logging - default to WARNING level to reduce noise
+    # Use --debug flag to enable debug logging
+    if '--debug' in sys.argv:
+        log_level = logging.DEBUG
+        sys.argv.remove('--debug')
+    else:
+        log_level = logging.WARNING
+
+    logging.basicConfig(
+        level=log_level,
+        format='%(levelname)s: %(message)s'
+    )
+
     # Create Qt Application
     app = QApplication(sys.argv)
     app.setApplicationName("ReportForge")

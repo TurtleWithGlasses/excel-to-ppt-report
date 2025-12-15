@@ -39,6 +39,44 @@ class DataMapper:
         if data_path:
             self.load_data(data_path)
 
+    def _find_column(self, df: pd.DataFrame, column_name: str) -> Optional[str]:
+        """
+        Find a column in DataFrame with case-insensitive and whitespace-tolerant matching.
+        
+        Args:
+            df: pandas DataFrame
+            column_name: The column name to find
+            
+        Returns:
+            The actual column name in the DataFrame, or None if not found
+        """
+        if column_name is None:
+            return None
+            
+        # First try exact match
+        if column_name in df.columns:
+            return column_name
+        
+        # Try case-insensitive match
+        column_name_lower = column_name.lower().strip()
+        for col in df.columns:
+            if col.lower().strip() == column_name_lower:
+                return col
+        
+        # Try partial match (column name contains or is contained)
+        for col in df.columns:
+            col_lower = col.lower().strip()
+            if column_name_lower in col_lower or col_lower in column_name_lower:
+                return col
+        
+        return None
+
+    def _normalize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean up DataFrame column names by stripping whitespace."""
+        df = df.copy()
+        df.columns = df.columns.str.strip()
+        return df
+
     def load_data(self, file_path: str, sheet_name: Union[str, int] = 0) -> pd.DataFrame:
         """
         Load data from Excel or CSV file.
@@ -165,7 +203,7 @@ class DataMapper:
         config_vars = component_config.get('variables', {})
         variables.update(config_vars)
 
-        # Add additional variables (may include template settings like title_slide)
+        # Add additional variables
         if additional_vars:
             variables.update(additional_vars)
 
@@ -176,6 +214,8 @@ class DataMapper:
         Get data for table/chart components.
 
         Applies:
+        - Computed columns (pivot-style counts from categorical columns)
+        - Group by aggregation
         - Column filtering
         - Column mapping/renaming
         - Sorting
@@ -190,12 +230,26 @@ class DataMapper:
         if self.data is None or self.data.empty:
             return pd.DataFrame()
 
-        df = self.data.copy()
+        df = self._normalize_columns(self.data)
 
-        # Filter columns
+        # Apply group_by aggregation if specified
+        group_by_config = data_source.get('group_by')
+        group_by = self._find_column(df, group_by_config) if group_by_config else None
+        aggregations = data_source.get('aggregations', {})
+        computed_columns = data_source.get('computed_columns', [])
+
+        if group_by and group_by in df.columns:
+            # Build aggregation with computed columns
+            df = self._aggregate_with_computed_columns(df, group_by, computed_columns, aggregations)
+
+        # Filter columns AFTER aggregation (with case-insensitive matching)
         columns = data_source.get('columns')
         if columns:
-            available_cols = [col for col in columns if col in df.columns]
+            available_cols = []
+            for col in columns:
+                actual_col = self._find_column(df, col)
+                if actual_col:
+                    available_cols.append(actual_col)
             if available_cols:
                 df = df[available_cols]
 
@@ -204,8 +258,9 @@ class DataMapper:
         if column_mapping:
             df = df.rename(columns=column_mapping)
 
-        # Sort data
-        sort_by = data_source.get('sort_by')
+        # Sort data (with case-insensitive matching)
+        sort_by_config = data_source.get('sort_by')
+        sort_by = self._find_column(df, sort_by_config) if sort_by_config else None
         if sort_by and sort_by in df.columns:
             ascending = data_source.get('ascending', False)
             df = df.sort_values(by=sort_by, ascending=ascending)
@@ -216,6 +271,104 @@ class DataMapper:
             df = df.head(top_n)
 
         return df
+
+    def _aggregate_with_computed_columns(
+        self,
+        df: pd.DataFrame,
+        group_by: str,
+        computed_columns: List[str],
+        aggregations: Dict[str, str]
+    ) -> pd.DataFrame:
+        """
+        Aggregate data with smart computed columns.
+
+        Computed columns create pivot-style counts from categorical columns:
+        - 'Toplam': Total count of records per group
+        - 'Pozitif', 'Negatif', 'Nötr': Counts based on Algı column values
+        - 'Basın', 'Radyo', 'Televizyon', 'İnternet': Media type counts from Mecra
+        - 'Ulusal', 'Yerel': Coverage counts from Medya Kapsam
+
+        Args:
+            df: Source DataFrame
+            group_by: Column to group by
+            computed_columns: List of computed column names to include
+            aggregations: Additional aggregation specifications
+
+        Returns:
+            Aggregated DataFrame with computed columns
+        """
+        # Start with the groupby object
+        grouped = df.groupby(group_by)
+
+        # Define computed column mappings
+        computed_mappings = {
+            'Toplam': ('__count__', None),
+            'Pozitif': ('Algı', ['Pozitif', 'POZİTİF', 'POZITIF', 'pozitif']),
+            'Negatif': ('Algı', ['Negatif', 'NEGATİF', 'NEGATIF', 'negatif']),
+            'Nötr': ('Algı', ['Nötr', 'NÖTR', 'Notr', 'NOTR', 'nötr']),
+            'YÜKSEK': ('Algı', ['YÜKSEK', 'Yüksek', 'yüksek']),
+            'ORTA': ('Algı', ['ORTA', 'Orta', 'orta']),
+            'DÜŞÜK': ('Algı', ['DÜŞÜK', 'Düşük', 'düşük']),
+            'Basın': (['Mecra', 'Medya Tür'], ['Basın', 'BASIN', 'basın', 'Gazete', 'GAZETE']),
+            'Radyo': (['Mecra', 'Medya Tür'], ['Radyo', 'RADYO', 'radyo']),
+            'Televizyon': (['Mecra', 'Medya Tür'], ['Televizyon', 'TV', 'TELEVİZYON', 'televizyon']),
+            'İnternet': (['Mecra', 'Medya Tür'], ['İnternet', 'İNTERNET', 'Internet', 'INTERNET', 'Online', 'ONLINE']),
+            'Ulusal': ('Medya Kapsam', ['Ulusal', 'ULUSAL', 'ulusal']),
+            'Yerel': ('Medya Kapsam', ['Yerel', 'YEREL', 'yerel']),
+        }
+
+        # Build aggregation dictionary
+        agg_dict = {}
+
+        # Add numeric column sums
+        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+        for col in numeric_cols:
+            if col != group_by:
+                agg_dict[col] = 'sum'
+
+        # Add explicit aggregations
+        for col, agg_func in aggregations.items():
+            if col in df.columns:
+                agg_dict[col] = agg_func
+
+        # Perform base aggregation
+        if agg_dict:
+            result_df = grouped.agg(agg_dict).reset_index()
+        else:
+            result_df = grouped.size().reset_index(name='__temp_count__')
+            result_df = result_df.drop('__temp_count__', axis=1)
+
+        # Add computed columns
+        for col_name in computed_columns:
+            if col_name in computed_mappings:
+                source_col_spec, values = computed_mappings[col_name]
+
+                if source_col_spec == '__count__':
+                    # Total count per group
+                    counts = grouped.size().reset_index(name=col_name)
+                    result_df = result_df.merge(counts[[group_by, col_name]], on=group_by, how='left')
+                else:
+                    # Find the source column (handle list of possible column names)
+                    if isinstance(source_col_spec, list):
+                        source_col = None
+                        for possible_col in source_col_spec:
+                            if possible_col in df.columns:
+                                source_col = possible_col
+                                break
+                    else:
+                        source_col = source_col_spec if source_col_spec in df.columns else None
+
+                    if source_col:
+                        # Count specific values in the source column
+                        filtered = df[df[source_col].isin(values)]
+                        if len(filtered) > 0:
+                            counts = filtered.groupby(group_by).size().reset_index(name=col_name)
+                            result_df = result_df.merge(counts[[group_by, col_name]], on=group_by, how='left')
+                            result_df[col_name] = result_df[col_name].fillna(0).astype(int)
+                        else:
+                            result_df[col_name] = 0
+
+        return result_df
 
     def _get_summary_data(self, data_source: Dict[str, Any]) -> pd.DataFrame:
         """

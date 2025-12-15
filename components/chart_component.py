@@ -14,12 +14,16 @@ import matplotlib
 import os
 import tempfile
 import warnings
+import logging
 
 # Use non-interactive backend for server environments
 matplotlib.use('Agg')
 
 # Suppress matplotlib tight_layout warnings
 warnings.filterwarnings('ignore', message='.*Tight layout.*')
+
+# Configure logging for this module
+logger = logging.getLogger(__name__)
 
 
 class ChartComponent(BaseComponent):
@@ -38,7 +42,7 @@ class ChartComponent(BaseComponent):
     CHART_STACKED_COLUMN = 'stacked_column'
     CHART_STACKED_BAR = 'stacked_bar'
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], template: Optional[Dict[str, Any]] = None):
         """
         Initialize ChartComponent.
 
@@ -60,7 +64,7 @@ class ChartComponent(BaseComponent):
                 - grid: Show grid lines
                 - font_size: Chart font size
         """
-        super().__init__(config)
+        super().__init__(config, template=template)
 
         # Chart type
         self.chart_type = config.get('chart_type', self.CHART_COLUMN)
@@ -274,68 +278,29 @@ class ChartComponent(BaseComponent):
 
             # Apply tight layout (suppress warnings if it fails)
             try:
-                plt.tight_layout(pad=1.0)  # Use padding instead of tight bbox
+                plt.tight_layout()
             except Exception:
                 pass  # Ignore layout warnings
 
-            # Calculate expected pixel dimensions
-            expected_width_px = int(fig_width * dpi)
-            expected_height_px = int(fig_height * dpi)
-            
-            # Maximum allowed dimensions (2^16 = 65536, use 10000 for safety)
-            MAX_DIMENSION_PX = 10000
-            
-            # Validate dimensions before saving
-            if expected_width_px > MAX_DIMENSION_PX or expected_height_px > MAX_DIMENSION_PX:
-                # Scale down if still too large
-                scale_factor = min(MAX_DIMENSION_PX / expected_width_px, MAX_DIMENSION_PX / expected_height_px, 1.0)
-                dpi = max(50, int(dpi * scale_factor))
-                expected_width_px = int(fig_width * dpi)
-                expected_height_px = int(fig_height * dpi)
-
-            # Save with validated DPI, use pad_inches instead of bbox_inches='tight'
-            # bbox_inches='tight' can cause images to exceed expected dimensions
-            plt.savefig(
-                temp_path, 
-                dpi=dpi, 
-                bbox_inches=None,  # Don't use 'tight' - it causes dimension issues
-                pad_inches=0.1,  # Small padding instead
-                facecolor='white',
-                edgecolor='none'
-            )
-            
-            # Verify saved image dimensions (check actual file size if possible)
-            try:
-                from PIL import Image
-                with Image.open(temp_path) as img:
-                    actual_width, actual_height = img.size
-                    if actual_width > MAX_DIMENSION_PX or actual_height > MAX_DIMENSION_PX:
-                        # Resize if needed
-                        if actual_width > MAX_DIMENSION_PX:
-                            scale = MAX_DIMENSION_PX / actual_width
-                            new_width = MAX_DIMENSION_PX
-                            new_height = int(actual_height * scale)
-                            img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                            img_resized.save(temp_path)
-            except ImportError:
-                pass  # PIL not available, skip verification
-            except Exception:
-                pass  # Could not verify image size, continue anyway
-            
+            # Save with same DPI as figure
+            plt.savefig(temp_path, dpi=dpi, bbox_inches='tight', facecolor='white')
             plt.close(fig)
 
             return temp_path
 
         except Exception as e:
-            print(f"Error generating chart: {e}")
-            import traceback
-            traceback.print_exc()  # Print full traceback for debugging
+            logger.warning(f"Error generating chart: {e}")
             if 'fig' in locals():
-                try:
-                    plt.close(fig)
-                except Exception:
-                    pass
+                plt.close(fig)
             return None
+
+    def _format_value(self, v) -> str:
+        """Safely format a value for display on chart, handling non-numeric types."""
+        try:
+            numeric_val = float(v)
+            return f'{numeric_val:,.0f}'
+        except (ValueError, TypeError):
+            return str(v)
 
     def _create_column_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create vertical column chart."""
@@ -346,20 +311,17 @@ class ChartComponent(BaseComponent):
                 index=self.x_column,
                 columns=self.series_column,
                 aggfunc='sum'
-            )
-            # Use 'bar' which creates vertical bars in pandas (confusing naming)
+            ).fillna(0)
             df_pivot.plot(kind='bar', ax=ax, color=colors, width=0.7)
         else:
-            # Single series vertical bars
+            # Single series - ensure y_data is numeric
             x_data = df[self.x_column].astype(str)
-            y_data = df[self.y_column]
-            # Cycle through colors for multiple bars
-            bar_colors = [colors[i % len(colors)] if colors else None for i in range(len(y_data))]
-            ax.bar(x_data, y_data, color=bar_colors, width=0.6)
+            y_data = pd.to_numeric(df[self.y_column], errors='coerce').fillna(0)
+            ax.bar(x_data, y_data, color=colors[0] if colors else None, width=0.6)
 
             if self.show_values:
                 for i, v in enumerate(y_data):
-                    ax.text(i, v, f'{v:,.0f}', ha='center', va='bottom', fontsize=8)
+                    ax.text(i, v, self._format_value(v), ha='center', va='bottom', fontsize=8)
 
     def _create_bar_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create horizontal bar chart."""
@@ -370,45 +332,44 @@ class ChartComponent(BaseComponent):
                 index=self.x_column,
                 columns=self.series_column,
                 aggfunc='sum'
-            )
+            ).fillna(0)
             df_pivot.plot(kind='barh', ax=ax, color=colors, height=0.7)
         else:
-            # Single series horizontal bars
+            # Single series - ensure y_data is numeric
             x_data = df[self.x_column].astype(str)
-            y_data = df[self.y_column]
-            # Cycle through colors for multiple bars
-            bar_colors = [colors[i % len(colors)] if colors else None for i in range(len(y_data))]
-            ax.barh(x_data, y_data, color=bar_colors, height=0.6)
+            y_data = pd.to_numeric(df[self.y_column], errors='coerce').fillna(0)
+            ax.barh(x_data, y_data, color=colors[0] if colors else None, height=0.6)
 
             if self.show_values:
                 for i, v in enumerate(y_data):
-                    ax.text(v, i, f' {v:,.0f}', ha='left', va='center', fontsize=8)
+                    ax.text(v, i, self._format_value(v), ha='left', va='center', fontsize=8)
 
     def _create_pie_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create pie chart."""
         labels = df[self.x_column].astype(str) if self.x_column else df.index
-        values = df[self.y_column]
+        # Ensure values are numeric for pie chart
+        values = pd.to_numeric(df[self.y_column], errors='coerce').fillna(0)
+        
+        # Handle edge case where all values are 0 or negative
+        if values.sum() <= 0:
+            # Replace with equal slices to avoid divide by zero
+            values = pd.Series([1] * len(values), index=values.index)
+            logger.debug("Pie chart: All values were zero, using equal slices")
 
-        # Create pie chart with optional percentage labels
-        pie_result = ax.pie(
+        wedges, texts, autotexts = ax.pie(
             values,
             labels=labels,
             colors=colors,
             autopct='%1.1f%%' if self.show_values else None,
-            startangle=90,
-            textprops={'fontsize': self.chart_font_size}
+            startangle=90
         )
 
-        # Unpack the result - could be 2 or 3 elements depending on autopct
-        if self.show_values:
-            wedges, texts, autotexts = pie_result
-            # Style percentages
+        # Style percentages
+        if autotexts:
             for autotext in autotexts:
                 autotext.set_color('white')
                 autotext.set_fontsize(9)
                 autotext.set_weight('bold')
-        else:
-            wedges, texts = pie_result
 
         ax.axis('equal')
 
@@ -419,31 +380,30 @@ class ChartComponent(BaseComponent):
             for idx, series_name in enumerate(df[self.series_column].unique()):
                 series_data = df[df[self.series_column] == series_name]
                 color = colors[idx % len(colors)] if colors else None
+                y_values = pd.to_numeric(series_data[self.y_column], errors='coerce').fillna(0)
                 ax.plot(
-                    series_data[self.x_column].astype(str),
-                    series_data[self.y_column],
+                    series_data[self.x_column],
+                    y_values,
                     marker='o',
                     label=series_name,
                     color=color,
-                    linewidth=2,
-                    markersize=6
+                    linewidth=2
                 )
         else:
-            # Single series
-            x_data = df[self.x_column].astype(str)
-            y_data = df[self.y_column]
+            # Single series - ensure y_data is numeric
+            x_data = df[self.x_column]
+            y_data = pd.to_numeric(df[self.y_column], errors='coerce').fillna(0)
             ax.plot(
                 x_data,
                 y_data,
                 marker='o',
                 color=colors[0] if colors else None,
-                linewidth=2,
-                markersize=6
+                linewidth=2
             )
 
             if self.show_values:
-                for i, (x, y) in enumerate(zip(x_data, y_data)):
-                    ax.text(i, y, f'{y:,.0f}', ha='center', va='bottom', fontsize=8)
+                for x, y in zip(x_data, y_data):
+                    ax.text(x, y, self._format_value(y), ha='center', va='bottom', fontsize=8)
 
     def _create_stacked_column_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create stacked vertical column chart."""
@@ -457,7 +417,7 @@ class ChartComponent(BaseComponent):
             index=self.x_column,
             columns=self.series_column,
             aggfunc='sum'
-        )
+        ).fillna(0)  # Fill NaN values from missing combinations
         df_pivot.plot(kind='bar', stacked=True, ax=ax, color=colors, width=0.7)
 
     def _create_stacked_bar_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
@@ -472,7 +432,7 @@ class ChartComponent(BaseComponent):
             index=self.x_column,
             columns=self.series_column,
             aggfunc='sum'
-        )
+        ).fillna(0)  # Fill NaN values from missing combinations
         df_pivot.plot(kind='barh', stacked=True, ax=ax, color=colors, height=0.7)
 
     def _get_colors(self, df: pd.DataFrame) -> List[str]:
@@ -483,46 +443,25 @@ class ChartComponent(BaseComponent):
             df: DataFrame with chart data
 
         Returns:
-            List of hex color codes (always returns at least one color)
+            List of hex color codes
         """
-        # Try user-defined colors first
-        if isinstance(self.colors, list) and len(self.colors) > 0:
+        if isinstance(self.colors, list) and self.colors:
             return self.colors
 
         if self.colors == 'brand':
-            # Use template brand colors
-            template_colors = self.get_template_color_list()
-            return template_colors
+            # Use template brand colors (TODO: get from template)
+            return ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
 
-        # Default matplotlib colors - with robust error handling
+        # Default matplotlib colors
         try:
             prop_cycle = plt.rcParams['axes.prop_cycle']
-            # Handle different prop_cycle formats safely
-            colors = []
-            for c in prop_cycle:
-                try:
-                    if isinstance(c, dict):
-                        color = c.get('color') or c.get('c')
-                    elif hasattr(c, 'color'):
-                        color = c.color
-                    elif hasattr(c, 'c'):
-                        color = c.c
-                    else:
-                        continue
-                    if color:
-                        colors.append(color)
-                except (KeyError, AttributeError, IndexError, TypeError):
-                    continue
-                if len(colors) >= 10:
-                    break
-            
+            colors = [c['color'] for c in prop_cycle][:10]
             if colors:
                 return colors
-        except (KeyError, AttributeError, IndexError, TypeError) as e:
-            # Fall through to default colors
+        except Exception:
             pass
 
-        # Fallback colors - always return at least one color
+        # Fallback colors if everything else fails
         return ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
 
     def _apply_chart_styling(self, ax, fig) -> None:

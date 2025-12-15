@@ -5,7 +5,7 @@ Used for: Slide titles, headers, body text, labels, static text
 Supports: Font styling, colors, alignment, dynamic variables
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from pptx.slide import Slide
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Pt
@@ -20,9 +20,13 @@ class TextComponent(BaseComponent):
     Supports static text and dynamic variables like {date}, {company}, {reportName}.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], template: Optional[Dict[str, Any]] = None):
         """
         Initialize TextComponent.
+
+        Args:
+            config: Component configuration
+            template: Template dictionary for brand colors and settings
 
         Config keys:
             - content: Text content (string or template with {variables})
@@ -34,7 +38,7 @@ class TextComponent(BaseComponent):
                 - color: Hex color (default: #000000)
                 - alignment: left/center/right/justify (default: left)
         """
-        super().__init__(config)
+        super().__init__(config, template)
         self.content = config.get('content', '')
         self.variables = config.get('variables', {})
 

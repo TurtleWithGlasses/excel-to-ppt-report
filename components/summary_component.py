@@ -31,9 +31,13 @@ class SummaryComponent(BaseComponent):
     INSIGHT_COMPARISONS = 'comparisons'
     INSIGHT_TOP_PERFORMERS = 'top_performers'
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], template: Optional[Dict[str, Any]] = None):
         """
         Initialize SummaryComponent.
+
+        Args:
+            config: Component configuration
+            template: Template dictionary for brand colors and settings
 
         Config keys:
             - data_source:
@@ -48,7 +52,7 @@ class SummaryComponent(BaseComponent):
                 - highlight_color: Color for important values
                 - font_size: Text size
         """
-        super().__init__(config)
+        super().__init__(config, template)
 
         # Insight configuration
         self.insight_types = self.data_source.get('insight_types', [self.INSIGHT_KEY_METRICS])

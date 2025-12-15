@@ -21,9 +21,13 @@ class ImageComponent(BaseComponent):
     Supports: Local files (.png, .jpg, .svg), URLs, PIL Image objects
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], template: Optional[Dict[str, Any]] = None):
         """
         Initialize ImageComponent.
+
+        Args:
+            config: Component configuration
+            template: Template dictionary for brand colors and settings
 
         Config keys:
             - data_source:
@@ -36,7 +40,7 @@ class ImageComponent(BaseComponent):
                 - opacity: 0-100 (transparency)
                 - maintain_aspect: Keep aspect ratio (default: True)
         """
-        super().__init__(config)
+        super().__init__(config, template)
 
         # Image source
         self.image_path = self.data_source.get('path')

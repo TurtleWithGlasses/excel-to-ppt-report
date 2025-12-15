@@ -41,20 +41,9 @@ class TableComponent(BaseComponent):
                 - row_color_1: First row color
                 - row_color_2: Second row color (for zebra)
                 - text_color: Table text color
-                - background_color: Background color for table (optional)
                 - font_size: Table font size
         """
-        super().__init__(config, template)
-
-        # Merge template table_slide style settings with component style
-        # Template settings act as defaults, component-specific settings override
-        if template and 'settings' in template:
-            table_slide_settings = template['settings'].get('table_slide', {})
-            table_slide_style = table_slide_settings.get('style', {})
-
-            # Merge: template defaults + component overrides
-            merged_style = {**table_slide_style, **self.style}
-            self.style = merged_style
+        super().__init__(config, template=template)
 
         # Table-specific config
         self.show_header = self.style.get('header_row', True)
@@ -95,17 +84,6 @@ class TableComponent(BaseComponent):
             # Add placeholder text if no data
             self._render_empty_table(slide)
             return
-
-        # Add background rectangle if background_color is specified
-        if 'background_color' in self.style:
-            r, g, b = self.get_color('background_color', '#FFFFFF')
-            bg_shape = slide.shapes.add_shape(
-                1,  # Rectangle shape type
-                self.x, self.y, self.width, self.height
-            )
-            bg_shape.fill.solid()
-            bg_shape.fill.fore_color.rgb = RGBColor(r, g, b)
-            bg_shape.line.fill.background()  # No border
 
         # Create table shape
         rows = len(df) + (1 if self.show_header else 0)
@@ -191,32 +169,19 @@ class TableComponent(BaseComponent):
         """
         for col_idx, col_name in enumerate(columns):
             cell = table.cell(0, col_idx)
-            
-            # Clear existing content
-            text_frame = cell.text_frame
-            text_frame.clear()
-            
-            # Add paragraph and run explicitly
-            paragraph = text_frame.paragraphs[0]
-            paragraph.alignment = PP_ALIGN.CENTER
-            
-            # Add run with text
-            run = paragraph.add_run()
-            run.text = str(col_name)
+            cell.text = str(col_name)
 
-            # Header formatting - now we can safely access the run
-            font = run.font
+            # Header formatting
+            paragraph = cell.text_frame.paragraphs[0]
+            paragraph.alignment = PP_ALIGN.CENTER
+
+            font = paragraph.runs[0].font
             font.name = self.get_font_name()
             font.size = self.get_font_size(default=11)
             font.bold = True
 
-            # Header colors - use template primary color if available
-            default_header_color = '#2563EB'
-            template_colors = self.get_template_colors()
-            if template_colors and 'primary' in template_colors:
-                default_header_color = template_colors['primary']
-            
-            r, g, b = self.get_color('header_color', default_header_color)
+            # Header colors
+            r, g, b = self.get_color('header_color', '#2563EB')
             cell.fill.solid()
             cell.fill.fore_color.rgb = RGBColor(r, g, b)
 
@@ -236,20 +201,11 @@ class TableComponent(BaseComponent):
         for row_idx, (_, row) in enumerate(df.iterrows()):
             for col_idx, value in enumerate(row):
                 cell = table.cell(row_idx + row_offset, col_idx)
-                
-                # Clear existing content and create fresh text
-                text_frame = cell.text_frame
-                text_frame.clear()
-                
-                # Add paragraph and run explicitly
-                paragraph = text_frame.paragraphs[0]
-                
-                # Add run with formatted value
-                run = paragraph.add_run()
-                run.text = self._format_value(value)
+                cell.text = self._format_value(value)
 
-                # Cell formatting - now we can safely access the run
-                font = run.font
+                # Cell formatting
+                paragraph = cell.text_frame.paragraphs[0]
+                font = paragraph.runs[0].font
                 font.name = self.get_font_name()
                 font.size = self.get_font_size(default=10)
 
@@ -321,17 +277,11 @@ class TableComponent(BaseComponent):
             self.x, self.y, self.width, self.height
         )
         text_frame = text_box.text_frame
-        text_frame.clear()
-        
         paragraph = text_frame.paragraphs[0]
+        paragraph.text = "[No data available for table]"
         paragraph.alignment = PP_ALIGN.CENTER
 
-        # Add run explicitly
-        run = paragraph.add_run()
-        run.text = "[No data available for table]"
-
-        # Now we can safely access the font
-        font = run.font
+        font = paragraph.runs[0].font
         font.size = Pt(14)
         font.color.rgb = RGBColor(156, 163, 175)  # Gray
 

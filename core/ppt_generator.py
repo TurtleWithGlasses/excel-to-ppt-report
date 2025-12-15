@@ -194,12 +194,234 @@ class PPTGenerator:
         slide_layout = self.presentation.slide_layouts[layout_index]
         slide = self.presentation.slides.add_slide(slide_layout)
 
-        # Get components
+        # Get components - check both old and new template formats
         components_config = slide_config.get('components', [])
+
+        # Handle new Template Builder format with slide_settings
+        if not components_config and 'slide_settings' in slide_config:
+            components_config = self._convert_slide_settings_to_components(slide_config)
 
         # Render each component
         for component_config in components_config:
             self._render_component(slide, component_config)
+
+    def _convert_slide_settings_to_components(self, slide_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Convert Template Builder slide_settings format to components array.
+
+        This handles the newer template format where slide configuration is stored
+        in slide_settings instead of components array.
+
+        Args:
+            slide_config: Slide configuration with slide_settings
+
+        Returns:
+            List of component configurations
+        """
+        components = []
+        slide_settings = slide_config.get('slide_settings', {})
+        slide_type = slide_config.get('type', '')
+
+        # Handle Table Slide
+        if slide_type == 'Table Slide' and 'table' in slide_settings:
+            table_settings = slide_settings['table']
+
+            # Add title if present
+            title = table_settings.get('title', '')
+            if title:
+                table_style = table_settings.get('style', {})
+                components.append({
+                    'type': 'text',
+                    'content': title,
+                    'position': {'x': 0.5, 'y': 0.3},
+                    'size': {'width': 9.0, 'height': 0.6},
+                    'style': {
+                        'font_name': table_style.get('font_name', 'Calibri'),
+                        'font_size': 18,
+                        'bold': True,
+                        'alignment': 'left'
+                    }
+                })
+
+            # Get the full style from slide_settings
+            slide_table_style = table_settings.get('style', {})
+
+            # Add table component with ALL settings from the template builder
+            component = {
+                'type': 'table',
+                'position': {'x': 0.5, 'y': 1.0 if title else 0.5},
+                'size': {'width': 9.0, 'height': 5.0 if title else 5.5},
+                'data_source': {
+                    'columns': table_settings.get('columns', []),
+                    'sort_by': table_settings.get('sort_by'),
+                    'ascending': table_settings.get('ascending', False),
+                    'group_by': table_settings.get('group_by'),
+                    'aggregations': table_settings.get('aggregations', {}),
+                    'computed_columns': table_settings.get('computed_columns', []),
+                },
+                'style': slide_table_style.copy() if slide_table_style else {}
+            }
+            components.append(component)
+
+        # Handle Detail Table Slide (shows all rows without grouping/aggregation)
+        elif slide_type == 'Detail Table Slide' and 'table' in slide_settings:
+            table_settings = slide_settings['table']
+
+            # Add title if present
+            title = table_settings.get('title', '')
+            if title:
+                table_style = table_settings.get('style', {})
+                components.append({
+                    'type': 'text',
+                    'content': title,
+                    'position': {'x': 0.5, 'y': 0.3},
+                    'size': {'width': 9.0, 'height': 0.6},
+                    'style': {
+                        'font_name': table_style.get('font_name', 'Calibri'),
+                        'font_size': 18,
+                        'bold': True,
+                        'alignment': 'left'
+                    }
+                })
+
+            # Get the full style from slide_settings
+            slide_table_style = table_settings.get('style', {})
+
+            # Add table component WITHOUT group_by - this shows all rows
+            component = {
+                'type': 'table',
+                'position': {'x': 0.5, 'y': 1.0 if title else 0.5},
+                'size': {'width': 9.0, 'height': 5.0 if title else 5.5},
+                'data_source': {
+                    'columns': table_settings.get('columns', []),
+                    'sort_by': table_settings.get('sort_by'),
+                    'ascending': table_settings.get('ascending', False),
+                    # NO group_by - keep all original rows
+                },
+                'style': slide_table_style.copy() if slide_table_style else {}
+            }
+            components.append(component)
+
+        # Handle Chart Slide
+        elif slide_type == 'Chart Slide' and 'chart' in slide_settings:
+            chart_settings = slide_settings['chart']
+
+            # Add title if present
+            title = chart_settings.get('title', '')
+            chart_style = chart_settings.get('style', {})
+            if title:
+                components.append({
+                    'type': 'text',
+                    'content': title,
+                    'position': {'x': 0.5, 'y': 0.3},
+                    'size': {'width': 9.0, 'height': 0.6},
+                    'style': {
+                        'font_name': chart_style.get('font_name', 'Calibri'),
+                        'font_size': 18,
+                        'bold': True,
+                        'alignment': 'left'
+                    }
+                })
+
+            # Determine if y_column is a computed column
+            y_column = chart_settings.get('y_column')
+            computed_column_names = ['Toplam', 'Pozitif', 'Negatif', 'Nötr', 'YÜKSEK', 'ORTA', 'DÜŞÜK',
+                                     'Basın', 'Radyo', 'Televizyon', 'İnternet', 'Ulusal', 'Yerel']
+            computed_columns = []
+            if y_column in computed_column_names:
+                computed_columns.append(y_column)
+
+            # Add chart component with ALL settings from the template builder
+            component = {
+                'type': 'chart',
+                'position': {'x': 0.5, 'y': 1.0 if title else 0.5},
+                'size': {'width': 9.0, 'height': 5.0 if title else 5.5},
+                'data_source': {
+                    'x_column': chart_settings.get('x_column'),
+                    'y_column': y_column,
+                    'calculation': chart_settings.get('calculation', 'sum'),
+                    'sort_by': chart_settings.get('sort_by'),
+                    'ascending': chart_settings.get('ascending', False),
+                    'top_n': chart_settings.get('top_n'),
+                    'group_by': chart_settings.get('x_column'),  # For chart, group by x column
+                    'computed_columns': computed_columns,  # Add computed columns for chart
+                },
+                'chart_type': chart_settings.get('chart_type', 'column'),
+                'style': chart_style.copy() if chart_style else {}
+            }
+            components.append(component)
+
+        # Handle Title Slide
+        elif slide_type == 'Title Slide' and 'title' in slide_settings:
+            title_settings = slide_settings['title']
+            template = self.template_manager.current_template
+            if template and 'settings' in template:
+                logo_path = template['settings'].get('logo_path')
+                embedded_logo_path = template['settings'].get('embedded_logo_path')
+
+                # Add main logo
+                if logo_path:
+                    logo_pos = title_settings.get('logo_position', {'x': 5.0, 'y': 1.0})
+                    logo_size = title_settings.get('logo_size', {'width': 2.0, 'height': 1.5})
+                    components.append({
+                        'type': 'image',
+                        'position': logo_pos,
+                        'size': logo_size,
+                        'data_source': {'path': logo_path}
+                    })
+
+                # Add embedded logo
+                if embedded_logo_path:
+                    embedded_pos = title_settings.get('embedded_logo_position', {'x': 0.5, 'y': 6.5})
+                    embedded_size = title_settings.get('embedded_logo_size', {'width': 1.5, 'height': 0.5})
+                    components.append({
+                        'type': 'image',
+                        'position': embedded_pos,
+                        'size': embedded_size,
+                        'data_source': {'path': embedded_logo_path}
+                    })
+
+                # Add title text
+                title_pos = title_settings.get('title_position', {'x': 0.5, 'y': 2.5})
+                components.append({
+                    'type': 'text',
+                    'content': title_settings.get('title', ''),
+                    'position': title_pos,
+                    'size': {'width': 9.0, 'height': 1.5},
+                    'style': {
+                        'font_size': 44,
+                        'bold': True,
+                        'alignment': 'center'
+                    }
+                })
+
+                # Add subtitle if present
+                if title_settings.get('subtitle'):
+                    components.append({
+                        'type': 'text',
+                        'content': title_settings.get('subtitle', ''),
+                        'position': {'x': 0.5, 'y': 4.0},
+                        'size': {'width': 9.0, 'height': 0.8},
+                        'style': {
+                            'font_size': 28,
+                            'alignment': 'center'
+                        }
+                    })
+
+                # Add description if present
+                if title_settings.get('description'):
+                    components.append({
+                        'type': 'text',
+                        'content': title_settings.get('description', ''),
+                        'position': {'x': 0.5, 'y': 4.8},
+                        'size': {'width': 9.0, 'height': 1.2},
+                        'style': {
+                            'font_size': 18,
+                            'alignment': 'center'
+                        }
+                    })
+
+        return components
 
     def _get_layout_index(self, layout_name: str) -> int:
         """
@@ -232,47 +454,20 @@ class PPTGenerator:
             component_config: Component configuration
         """
         try:
-            # Get current template for brand colors
-            template = self.template_manager.current_template
+            # Create component
+            component = self.component_factory.create_component(component_config)
 
-            # Create component with template reference
-            component = self.component_factory.create_component(
-                component_config,
-                template=template
-            )
-
-            # Prepare variables including template title_slide settings
-            variables = self.custom_variables.copy()
-            
-            # Add title_slide settings from template if available
-            if template and 'settings' in template:
-                title_slide = template['settings'].get('title_slide', {})
-                if title_slide:
-                    # Add title_slide variables for text substitution
-                    variables['title_slide_title'] = title_slide.get('title', '')
-                    variables['title_slide_subtitle'] = title_slide.get('subtitle', '')
-                    variables['title_slide_description'] = title_slide.get('description', '')
-            
             # Get data for component
             component_data = self.data_mapper.get_data_for_component(
                 component_config,
-                variables
+                self.custom_variables
             )
 
             # Render component
             component.render(slide, component_data)
 
-        except IndexError as e:
-            # Handle tuple/list index errors specifically
-            import traceback
-            print(f"Warning: Failed to render component (index error): {str(e)}")
-            print(f"Component config: {component_config.get('type', 'unknown')}")
-            traceback.print_exc()
-            # Continue with other components
         except Exception as e:
             print(f"Warning: Failed to render component: {str(e)}")
-            import traceback
-            traceback.print_exc()  # Print full traceback for debugging
             # Continue with other components
 
     def _generate_output_path(self, template: Dict[str, Any]) -> str:

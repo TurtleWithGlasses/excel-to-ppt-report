@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QGroupBox, QFormLayout, QListWidgetItem, QGraphicsTextItem, QGraphicsPixmapItem
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
-from PyQt6.QtGui import QFont, QColor, QPainter, QPixmap, QIcon
+from PyQt6.QtGui import QFont, QColor, QPainter, QPixmap, QIcon, QPen, QBrush
 import json
 from datetime import datetime
 import os
@@ -860,10 +860,6 @@ class TemplateBuilder(QMainWindow):
 
     def _show_table_editor(self):
         """Show table editing panel"""
-        print(f"[DEBUG] _show_table_editor: Called")
-        import traceback
-        print(f"[DEBUG] _show_table_editor: Call stack:\n{''.join(traceback.format_stack()[-5:-1])}")
-
         title_label = QLabel("Table Configuration")
         title_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         self.config_layout.addWidget(title_label)
@@ -877,7 +873,6 @@ class TemplateBuilder(QMainWindow):
         existing_sort_order = table_slide_settings.get('ascending', False)
         existing_group_by = table_slide_settings.get('group_by', '')
         existing_columns = table_slide_settings.get('columns', [])
-        print(f"[DEBUG] _show_table_editor: existing_columns from template_data: {existing_columns}")
         
         # Get style settings
         style_settings = table_slide_settings.get('style', {})
@@ -1957,6 +1952,12 @@ class TemplateBuilder(QMainWindow):
         # Get chart settings
         chart_settings = self.template_data.get('chart_slide', {})
         
+        # Get chart type from combo box or settings
+        try:
+            chart_type = self.chart_type_combo.currentText() if hasattr(self, 'chart_type_combo') and self.chart_type_combo else chart_settings.get('chart_type', 'column')
+        except RuntimeError:
+            chart_type = chart_settings.get('chart_type', 'column')
+        
         # Safely get values from inputs
         try:
             title = self.chart_title_input.text() if hasattr(self, 'chart_title_input') and self.chart_title_input else ''
@@ -1977,25 +1978,19 @@ class TemplateBuilder(QMainWindow):
             title_item.setDefaultTextColor(QColor("#1F2937"))
             title_item.setPos(0.5 * INCH_TO_PIXEL, 0.3 * INCH_TO_PIXEL)
         
-        # Get chart type
-        try:
-            chart_type = self.chart_type_combo.currentText() if hasattr(self, 'chart_type_combo') and self.chart_type_combo else chart_settings.get('chart_type', 'column')
-        except RuntimeError:
-            chart_type = chart_settings.get('chart_type', 'column')
-
-        # Render chart preview based on type
+        # Chart dimensions
         chart_y = 1.0 * INCH_TO_PIXEL
         chart_x = 0.5 * INCH_TO_PIXEL
         chart_width = 9.0 * INCH_TO_PIXEL
         chart_height = 3.5 * INCH_TO_PIXEL
-
+        
         # Chart background
         self.preview_scene.addRect(
             chart_x, chart_y,
             chart_width, chart_height,
             QColor("#FFFFFF"), QColor("#E5E7EB")
         )
-
+        
         # Get colors from UI or settings
         try:
             if hasattr(self, 'chart_colors_list') and self.chart_colors_list:
@@ -2006,54 +2001,51 @@ class TemplateBuilder(QMainWindow):
         except RuntimeError:
             chart_style = chart_settings.get('style', {})
             colors = chart_style.get('colors', ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'])
-
+        
         if not colors:
             colors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
-
-        # Render appropriate chart type
+        
+        # Render chart based on type
         if chart_type == 'pie':
-            self._render_pie_preview(chart_x, chart_y, chart_width, chart_height, colors)
+            self._render_pie_chart_preview(chart_x, chart_y, chart_width, chart_height, colors)
         elif chart_type == 'line':
-            self._render_line_preview(chart_x, chart_y, chart_width, chart_height, colors)
+            self._render_line_chart_preview(chart_x, chart_y, chart_width, chart_height, colors)
         elif chart_type == 'bar':
-            self._render_bar_preview(chart_x, chart_y, chart_width, chart_height, colors)
-        elif chart_type == 'column':
-            self._render_column_preview(chart_x, chart_y, chart_width, chart_height, colors)
-        elif chart_type == 'stacked_column':
-            self._render_stacked_column_preview(chart_x, chart_y, chart_width, chart_height, colors)
-        elif chart_type == 'stacked_bar':
-            self._render_stacked_bar_preview(chart_x, chart_y, chart_width, chart_height, colors)
-        else:
-            # Default to column
-            self._render_column_preview(chart_x, chart_y, chart_width, chart_height, colors)
+            self._render_bar_chart_preview(chart_x, chart_y, chart_width, chart_height, colors)
+        elif chart_type in ('stacked_column', 'stacked_bar'):
+            self._render_stacked_chart_preview(chart_x, chart_y, chart_width, chart_height, colors, chart_type)
+        else:  # column (default)
+            self._render_column_chart_preview(chart_x, chart_y, chart_width, chart_height, colors)
 
-    def _render_column_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
-        """Render column (vertical bar) chart preview"""
+    def _render_column_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+        """Render column chart preview (vertical bars)"""
         num_bars = 5
         bar_width = chart_width / (num_bars + 1)
         max_height = chart_height * 0.8
-
+        
         for i in range(num_bars):
             bar_x = chart_x + (i + 0.5) * bar_width
             bar_height = max_height * (0.9 - i * 0.15)
             bar_y = chart_y + chart_height - bar_height
-
+            
             color_index = i % len(colors)
             bar_color = QColor(colors[color_index])
-
+            
             self.preview_scene.addRect(
                 bar_x - bar_width * 0.3, bar_y,
                 bar_width * 0.6, bar_height,
                 bar_color, bar_color
             )
-
+            
+            # Value label on top
             value_text = str(100 - i * 15)
             value_font = QFont("Calibri", 9)
             value_item = self.preview_scene.addText(value_text, value_font)
             value_item.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_item.boundingRect()
             value_item.setPos(bar_x - value_rect.width() / 2, bar_y - value_rect.height() - 2)
-
+            
+            # Category label below
             category_text = f"Item {i + 1}"
             category_font = QFont("Calibri", 8)
             category_item = self.preview_scene.addText(category_text, category_font)
@@ -2061,158 +2053,249 @@ class TemplateBuilder(QMainWindow):
             category_rect = category_item.boundingRect()
             category_item.setPos(bar_x - category_rect.width() / 2, chart_y + chart_height + 5)
 
-    def _render_bar_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
-        """Render horizontal bar chart preview"""
+    def _render_bar_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+        """Render bar chart preview (horizontal bars)"""
         num_bars = 5
         bar_height = chart_height / (num_bars + 1)
         max_width = chart_width * 0.8
-
+        
         for i in range(num_bars):
-            bar_y = chart_y + (i + 0.5) * bar_height
-            bar_width = max_width * (0.9 - i * 0.15)
-
+            bar_y_pos = chart_y + (i + 0.5) * bar_height
+            bar_w = max_width * (0.9 - i * 0.15)
+            
             color_index = i % len(colors)
             bar_color = QColor(colors[color_index])
-
+            
             self.preview_scene.addRect(
-                chart_x + 100, bar_y - bar_height * 0.3,
-                bar_width, bar_height * 0.6,
+                chart_x + 60, bar_y_pos - bar_height * 0.3,
+                bar_w, bar_height * 0.6,
                 bar_color, bar_color
             )
-
+            
+            # Value label at end
             value_text = str(100 - i * 15)
             value_font = QFont("Calibri", 9)
             value_item = self.preview_scene.addText(value_text, value_font)
             value_item.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_item.boundingRect()
-            value_item.setPos(chart_x + 100 + bar_width + 5, bar_y - value_rect.height() / 2)
-
+            value_item.setPos(chart_x + 60 + bar_w + 5, bar_y_pos - value_rect.height() / 2)
+            
+            # Category label on left
             category_text = f"Item {i + 1}"
             category_font = QFont("Calibri", 8)
             category_item = self.preview_scene.addText(category_text, category_font)
             category_item.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_item.boundingRect()
-            category_item.setPos(chart_x + 10, bar_y - category_rect.height() / 2)
+            category_item.setPos(chart_x, bar_y_pos - category_rect.height() / 2)
 
-    def _render_pie_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+    def _render_pie_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
         """Render pie chart preview"""
         import math
+        
+        # Pie center and radius
         center_x = chart_x + chart_width / 2
         center_y = chart_y + chart_height / 2
-        radius = min(chart_width, chart_height) * 0.35
-
-        # Draw 5 slices
-        angles = [72, 72, 72, 72, 144]  # degrees for each slice
+        radius = min(chart_width, chart_height) * 0.4
+        
+        # Sample data for pie slices
+        values = [30, 25, 20, 15, 10]
+        total = sum(values)
         start_angle = 0
-
-        for i, angle in enumerate(angles):
+        
+        for i, value in enumerate(values):
+            # Calculate sweep angle (in 16ths of a degree for Qt)
+            sweep_angle = int((value / total) * 360 * 16)
+            
             color_index = i % len(colors)
             slice_color = QColor(colors[color_index])
+            
+            # Create ellipse item for pie slice
+            from PyQt6.QtWidgets import QGraphicsEllipseItem
+            from PyQt6.QtGui import QPen
+            
+            pie_rect = self.preview_scene.addEllipse(
+                center_x - radius, center_y - radius,
+                radius * 2, radius * 2,
+                QPen(slice_color, 2), slice_color
+            )
+            pie_rect.setStartAngle(start_angle)
+            pie_rect.setSpanAngle(sweep_angle)
+            
+            # Calculate label position (middle of slice)
+            mid_angle = (start_angle + sweep_angle / 2) / 16.0
+            label_radius = radius * 0.7
+            label_x = center_x + label_radius * math.cos(math.radians(mid_angle))
+            label_y = center_y - label_radius * math.sin(math.radians(mid_angle))
+            
+            # Value label
+            value_font = QFont("Calibri", 9, QFont.Weight.Bold)
+            value_item = self.preview_scene.addText(f"{value}%", value_font)
+            value_item.setDefaultTextColor(QColor("#FFFFFF"))
+            value_rect = value_item.boundingRect()
+            value_item.setPos(label_x - value_rect.width() / 2, label_y - value_rect.height() / 2)
+            
+            start_angle += sweep_angle
+        
+        # Legend
+        legend_x = chart_x + chart_width - 100
+        legend_y = chart_y + 10
+        for i, value in enumerate(values):
+            color_index = i % len(colors)
+            legend_color = QColor(colors[color_index])
+            
+            # Color box
+            self.preview_scene.addRect(
+                legend_x, legend_y + i * 18,
+                12, 12,
+                legend_color, legend_color
+            )
+            
+            # Legend text
+            legend_font = QFont("Calibri", 8)
+            legend_item = self.preview_scene.addText(f"Item {i + 1}", legend_font)
+            legend_item.setDefaultTextColor(QColor("#6B7280"))
+            legend_item.setPos(legend_x + 16, legend_y + i * 18 - 2)
 
-            # Use QPainterPath to draw pie slice
-            from PyQt6.QtGui import QPainterPath
-            from PyQt6.QtCore import QRectF
-
-            rect = QRectF(center_x - radius, center_y - radius, radius * 2, radius * 2)
-            path = QPainterPath()
-            path.moveTo(center_x, center_y)
-            path.arcTo(rect, start_angle, angle)
-            path.closeSubpath()
-
-            self.preview_scene.addPath(path, slice_color, slice_color)
-
-            start_angle += angle
-
-    def _render_line_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
+    def _render_line_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
         """Render line chart preview"""
         from PyQt6.QtGui import QPen
-        from PyQt6.QtCore import Qt
-
-        num_points = 6
+        
+        num_points = 5
         point_spacing = chart_width / (num_points + 1)
-
-        # Generate sample data points
-        heights = [0.3, 0.6, 0.5, 0.7, 0.4, 0.8]
-
-        pen = QPen(QColor(colors[0]))
-        pen.setWidth(3)
-
-        for i in range(len(heights) - 1):
-            x1 = chart_x + (i + 1) * point_spacing
-            y1 = chart_y + chart_height - (heights[i] * chart_height * 0.8)
-            x2 = chart_x + (i + 2) * point_spacing
-            y2 = chart_y + chart_height - (heights[i + 1] * chart_height * 0.8)
-
-            # Draw line
-            self.preview_scene.addLine(x1, y1, x2, y2, pen)
-
-            # Draw point
-            self.preview_scene.addEllipse(x1 - 4, y1 - 4, 8, 8, pen, QColor(colors[0]))
-
-        # Draw last point
-        x_last = chart_x + len(heights) * point_spacing
-        y_last = chart_y + chart_height - (heights[-1] * chart_height * 0.8)
-        self.preview_scene.addEllipse(x_last - 4, y_last - 4, 8, 8, pen, QColor(colors[0]))
-
-    def _render_stacked_column_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
-        """Render stacked vertical column chart preview"""
-        num_bars = 4
-        bar_width = chart_width / (num_bars + 1)
-
-        for i in range(num_bars):
-            bar_x = chart_x + (i + 0.5) * bar_width
-            current_y = chart_y + chart_height
-
-            # Draw 3 segments per bar (stacked vertically)
-            segments = [0.3, 0.25, 0.2]
-            for j, segment_height in enumerate(segments):
-                color_index = j % len(colors)
-                segment_color = QColor(colors[color_index])
-
-                height = chart_height * segment_height
-                current_y -= height
-                self.preview_scene.addRect(
-                    bar_x - bar_width * 0.3, current_y,
-                    bar_width * 0.6, height,
-                    segment_color, segment_color
-                )
-
-            category_text = f"Item {i + 1}"
+        max_height = chart_height * 0.8
+        
+        # Sample data for line
+        values = [100, 85, 70, 55, 40]
+        
+        # Draw grid lines
+        grid_pen = QPen(QColor("#E5E7EB"), 1)
+        for i in range(5):
+            y = chart_y + chart_height - (i + 1) * chart_height / 5
+            self.preview_scene.addLine(chart_x, y, chart_x + chart_width, y, grid_pen)
+        
+        # Draw lines connecting points
+        line_color = QColor(colors[0])
+        line_pen = QPen(line_color, 3)
+        
+        points = []
+        for i, value in enumerate(values):
+            x = chart_x + (i + 1) * point_spacing
+            y = chart_y + chart_height - (value / 100) * max_height
+            points.append((x, y))
+        
+        # Draw lines
+        for i in range(len(points) - 1):
+            self.preview_scene.addLine(
+                points[i][0], points[i][1],
+                points[i + 1][0], points[i + 1][1],
+                line_pen
+            )
+        
+        # Draw points and labels
+        for i, (x, y) in enumerate(points):
+            # Point circle
+            point_color = QColor(colors[i % len(colors)])
+            self.preview_scene.addEllipse(
+                x - 5, y - 5, 10, 10,
+                QPen(point_color, 2), point_color
+            )
+            
+            # Value label
+            value_font = QFont("Calibri", 9)
+            value_item = self.preview_scene.addText(str(values[i]), value_font)
+            value_item.setDefaultTextColor(QColor("#1F2937"))
+            value_rect = value_item.boundingRect()
+            value_item.setPos(x - value_rect.width() / 2, y - value_rect.height() - 8)
+            
+            # Category label
             category_font = QFont("Calibri", 8)
-            category_item = self.preview_scene.addText(category_text, category_font)
+            category_item = self.preview_scene.addText(f"Item {i + 1}", category_font)
             category_item.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_item.boundingRect()
-            category_item.setPos(bar_x - category_rect.width() / 2, chart_y + chart_height + 5)
+            category_item.setPos(x - category_rect.width() / 2, chart_y + chart_height + 5)
 
-    def _render_stacked_bar_preview(self, chart_x, chart_y, chart_width, chart_height, colors):
-        """Render stacked horizontal bar chart preview"""
-        num_bars = 4
-        bar_height = chart_height / (num_bars + 1)
-
-        for i in range(num_bars):
-            bar_y = chart_y + (i + 0.5) * bar_height
-            current_x = chart_x + 100
-
-            # Draw 3 segments per bar
-            segments = [0.3, 0.25, 0.2]
-            for j, segment_width in enumerate(segments):
-                color_index = j % len(colors)
-                segment_color = QColor(colors[color_index])
-
-                width = chart_width * segment_width
-                self.preview_scene.addRect(
-                    current_x, bar_y - bar_height * 0.3,
-                    width, bar_height * 0.6,
-                    segment_color, segment_color
-                )
-                current_x += width
-
-            category_text = f"Item {i + 1}"
-            category_font = QFont("Calibri", 8)
-            category_item = self.preview_scene.addText(category_text, category_font)
-            category_item.setDefaultTextColor(QColor("#6B7280"))
-            category_rect = category_item.boundingRect()
-            category_item.setPos(chart_x + 10, bar_y - category_rect.height() / 2)
+    def _render_stacked_chart_preview(self, chart_x, chart_y, chart_width, chart_height, colors, chart_type):
+        """Render stacked bar/column chart preview"""
+        num_categories = 4
+        num_series = 3
+        
+        if chart_type == 'stacked_column':
+            # Stacked column (vertical)
+            bar_width = chart_width / (num_categories + 1)
+            max_height = chart_height * 0.8
+            
+            for i in range(num_categories):
+                bar_x = chart_x + (i + 0.5) * bar_width
+                current_y = chart_y + chart_height
+                
+                # Stack values (each segment)
+                segment_values = [30, 25, 20]  # Bottom to top
+                total = sum(segment_values)
+                
+                for j, value in enumerate(segment_values):
+                    segment_height = (value / 100) * max_height * (1 - i * 0.1)
+                    segment_color = QColor(colors[j % len(colors)])
+                    
+                    self.preview_scene.addRect(
+                        bar_x - bar_width * 0.3, current_y - segment_height,
+                        bar_width * 0.6, segment_height,
+                        segment_color, segment_color
+                    )
+                    current_y -= segment_height
+                
+                # Category label
+                category_font = QFont("Calibri", 8)
+                category_item = self.preview_scene.addText(f"Cat {i + 1}", category_font)
+                category_item.setDefaultTextColor(QColor("#6B7280"))
+                category_rect = category_item.boundingRect()
+                category_item.setPos(bar_x - category_rect.width() / 2, chart_y + chart_height + 5)
+        else:
+            # Stacked bar (horizontal)
+            bar_height = chart_height / (num_categories + 1)
+            max_width = chart_width * 0.8
+            
+            for i in range(num_categories):
+                bar_y_pos = chart_y + (i + 0.5) * bar_height
+                current_x = chart_x + 60
+                
+                # Stack values (each segment)
+                segment_values = [30, 25, 20]  # Left to right
+                
+                for j, value in enumerate(segment_values):
+                    segment_width = (value / 100) * max_width * (1 - i * 0.1)
+                    segment_color = QColor(colors[j % len(colors)])
+                    
+                    self.preview_scene.addRect(
+                        current_x, bar_y_pos - bar_height * 0.3,
+                        segment_width, bar_height * 0.6,
+                        segment_color, segment_color
+                    )
+                    current_x += segment_width
+                
+                # Category label on left
+                category_font = QFont("Calibri", 8)
+                category_item = self.preview_scene.addText(f"Cat {i + 1}", category_font)
+                category_item.setDefaultTextColor(QColor("#6B7280"))
+                category_rect = category_item.boundingRect()
+                category_item.setPos(chart_x, bar_y_pos - category_rect.height() / 2)
+        
+        # Legend for stacked charts
+        legend_x = chart_x + chart_width - 100
+        legend_y = chart_y + 10
+        series_names = ["Series 1", "Series 2", "Series 3"]
+        for i, name in enumerate(series_names):
+            legend_color = QColor(colors[i % len(colors)])
+            
+            self.preview_scene.addRect(
+                legend_x, legend_y + i * 18,
+                12, 12,
+                legend_color, legend_color
+            )
+            
+            legend_font = QFont("Calibri", 8)
+            legend_item = self.preview_scene.addText(name, legend_font)
+            legend_item.setDefaultTextColor(QColor("#6B7280"))
+            legend_item.setPos(legend_x + 16, legend_y + i * 18 - 2)
 
     def _render_table_slide_preview(self, slide):
         """Render table slide components in preview"""
@@ -2254,21 +2337,80 @@ class TemplateBuilder(QMainWindow):
             font_size = self.table_font_size_spin.value() if hasattr(self, 'table_font_size_spin') and self.table_font_size_spin else table_style.get('font_size', 11)
         except RuntimeError:
             font_size = table_style.get('font_size', 11)
-        header_color = QColor(table_style.get('header_color', '#2563EB'))
-        header_text_color = QColor(table_style.get('header_text_color', '#FFFFFF'))
-        row_color_1 = QColor(table_style.get('row_color_1', '#FFFFFF'))
-        row_color_2 = QColor(table_style.get('row_color_2', '#F9FAFB'))
-        text_color = QColor(table_style.get('text_color', '#1F2937'))
-        bg_color = QColor(table_style.get('background_color', '#FFFFFF'))
-        border_color = QColor(table_style.get('border_color', '#E5E7EB'))
+        
+        # Get colors from UI widgets if available, otherwise from saved template
+        try:
+            header_color_str = self.table_header_color_label.text() if hasattr(self, 'table_header_color_label') and self.table_header_color_label else table_style.get('header_color', '#2563EB')
+        except RuntimeError:
+            header_color_str = table_style.get('header_color', '#2563EB')
+        header_color = QColor(header_color_str)
+        
+        try:
+            header_text_color_str = self.table_header_text_color_label.text() if hasattr(self, 'table_header_text_color_label') and self.table_header_text_color_label else table_style.get('header_text_color', '#FFFFFF')
+        except RuntimeError:
+            header_text_color_str = table_style.get('header_text_color', '#FFFFFF')
+        header_text_color = QColor(header_text_color_str)
+        
+        try:
+            row_color_1_str = self.table_row1_color_label.text() if hasattr(self, 'table_row1_color_label') and self.table_row1_color_label else table_style.get('row_color_1', '#FFFFFF')
+        except RuntimeError:
+            row_color_1_str = table_style.get('row_color_1', '#FFFFFF')
+        row_color_1 = QColor(row_color_1_str)
+        
+        try:
+            row_color_2_str = self.table_row2_color_label.text() if hasattr(self, 'table_row2_color_label') and self.table_row2_color_label else table_style.get('row_color_2', '#F9FAFB')
+        except RuntimeError:
+            row_color_2_str = table_style.get('row_color_2', '#F9FAFB')
+        row_color_2 = QColor(row_color_2_str)
+        
+        try:
+            text_color_str = self.table_text_color_label.text() if hasattr(self, 'table_text_color_label') and self.table_text_color_label else table_style.get('text_color', '#1F2937')
+        except RuntimeError:
+            text_color_str = table_style.get('text_color', '#1F2937')
+        text_color = QColor(text_color_str)
+        
+        try:
+            bg_color_str = self.table_bg_color_label.text() if hasattr(self, 'table_bg_color_label') and self.table_bg_color_label else table_style.get('background_color', '#FFFFFF')
+        except RuntimeError:
+            bg_color_str = table_style.get('background_color', '#FFFFFF')
+        bg_color = QColor(bg_color_str)
+        
+        try:
+            border_color_str = self.table_border_color_label.text() if hasattr(self, 'table_border_color_label') and self.table_border_color_label else table_style.get('border_color', '#E5E7EB')
+        except RuntimeError:
+            border_color_str = table_style.get('border_color', '#E5E7EB')
+        border_color = QColor(border_color_str)
 
-        # Get text style settings
-        header_bold = table_style.get('header_bold', True)
-        header_italic = table_style.get('header_italic', False)
-        text_bold = table_style.get('text_bold', False)
-        text_italic = table_style.get('text_italic', False)
-        header_alignment = table_style.get('header_alignment', 'Center')
-        text_alignment = table_style.get('text_alignment', 'Left')
+        # Get text style settings from UI widgets if available
+        try:
+            header_bold = self.table_header_bold_check.isChecked() if hasattr(self, 'table_header_bold_check') and self.table_header_bold_check else table_style.get('header_bold', True)
+        except RuntimeError:
+            header_bold = table_style.get('header_bold', True)
+        
+        try:
+            header_italic = self.table_header_italic_check.isChecked() if hasattr(self, 'table_header_italic_check') and self.table_header_italic_check else table_style.get('header_italic', False)
+        except RuntimeError:
+            header_italic = table_style.get('header_italic', False)
+        
+        try:
+            text_bold = self.table_text_bold_check.isChecked() if hasattr(self, 'table_text_bold_check') and self.table_text_bold_check else table_style.get('text_bold', False)
+        except RuntimeError:
+            text_bold = table_style.get('text_bold', False)
+        
+        try:
+            text_italic = self.table_text_italic_check.isChecked() if hasattr(self, 'table_text_italic_check') and self.table_text_italic_check else table_style.get('text_italic', False)
+        except RuntimeError:
+            text_italic = table_style.get('text_italic', False)
+        
+        try:
+            header_alignment = self.table_header_align_combo.currentText() if hasattr(self, 'table_header_align_combo') and self.table_header_align_combo else table_style.get('header_alignment', 'Center')
+        except RuntimeError:
+            header_alignment = table_style.get('header_alignment', 'Center')
+        
+        try:
+            text_alignment = self.table_text_align_combo.currentText() if hasattr(self, 'table_text_align_combo') and self.table_text_align_combo else table_style.get('text_alignment', 'Left')
+        except RuntimeError:
+            text_alignment = table_style.get('text_alignment', 'Left')
 
         # Get selected columns - respect user's selection, even if empty
         selected_columns = []
@@ -2347,11 +2489,12 @@ class TemplateBuilder(QMainWindow):
         header_font.setItalic(header_italic)
         for i, col in enumerate(selected_columns):
             col_x = table_x + i * col_width
-            # Cell border
+            # Cell border (use NoBrush so we don't overwrite the header background)
+            border_pen = QPen(border_color)
             self.preview_scene.addRect(
                 col_x, table_y,
                 col_width, row_height,
-                border_color, border_color
+                border_pen, QBrush(Qt.BrushStyle.NoBrush)
             )
             # Header text - truncate if too long for cell
             header_text = col
@@ -2401,11 +2544,12 @@ class TemplateBuilder(QMainWindow):
             # Cell borders and content
             for col_idx in range(num_cols):
                 col_x = table_x + col_idx * col_width
-                # Cell border
+                # Cell border (use NoBrush so we don't overwrite the row background)
+                border_pen = QPen(border_color)
                 self.preview_scene.addRect(
                     col_x, row_y,
                     col_width, row_height,
-                    border_color, border_color
+                    border_pen, QBrush(Qt.BrushStyle.NoBrush)
                 )
                 
                 # Cell text (placeholder or empty)
@@ -2443,11 +2587,9 @@ class TemplateBuilder(QMainWindow):
 
     def _get_selected_table_columns(self):
         """Get list of selected table columns"""
-        print(f"[DEBUG] _get_selected_table_columns: Called")
         # First, try to get from template_data if widgets might be deleted
         if not hasattr(self, 'table_columns_list'):
             table_columns = self.template_data.get('table_slide', {}).get('columns', [])
-            print(f"[DEBUG] _get_selected_table_columns: No widget, returning from template_data: {table_columns}")
             # Return exactly what's in template_data, even if empty
             return table_columns
 
@@ -2456,23 +2598,17 @@ class TemplateBuilder(QMainWindow):
             widget = self.table_columns_list
             # Try to access the widget - if it's deleted, this will raise RuntimeError
             count = widget.count()
-            print(f"[DEBUG] _get_selected_table_columns: Widget has {count} items")
             for i in range(count):
                 item = widget.item(i)
                 if item and item.checkState() == Qt.CheckState.Checked:
                     selected.append(item.text())
-                    print(f"[DEBUG] _get_selected_table_columns: Item {i} '{item.text()}' is CHECKED")
-                elif item:
-                    print(f"[DEBUG] _get_selected_table_columns: Item {i} '{item.text()}' is UNCHECKED")
-        except (RuntimeError, SystemError, AttributeError, Exception) as e:
+        except (RuntimeError, SystemError, AttributeError, Exception):
             # Widget was deleted or inaccessible, fall back to template_data
-            print(f"[DEBUG] _get_selected_table_columns: Exception accessing widget: {e}")
             table_columns = self.template_data.get('table_slide', {}).get('columns', [])
             # Return exactly what's in template_data, even if empty
             return table_columns
 
         # Return exactly what user selected, even if empty
-        print(f"[DEBUG] _get_selected_table_columns: Returning: {selected}")
         return selected
 
     def _get_selected_chart_colors(self):
@@ -2557,14 +2693,11 @@ class TemplateBuilder(QMainWindow):
             if hasattr(self, 'table_columns_list') and self.table_columns_list:
                 try:
                     selected_cols = self._get_selected_table_columns()
-                    print(f"[DEBUG] _save_table_styling_to_template: Got columns from widget: {selected_cols}")
                     # Always save whatever user selected, even if empty list
                     # Use empty list explicitly if None or empty
                     table_slide['columns'] = selected_cols if selected_cols else []
-                    print(f"[DEBUG] _save_table_styling_to_template: Saved columns to table_slide: {table_slide['columns']}")
-                except (RuntimeError, AttributeError, SystemError) as e:
+                except (RuntimeError, AttributeError, SystemError):
                     # Widget was deleted, keep existing columns
-                    print(f"[DEBUG] _save_table_styling_to_template: Widget deleted, keeping existing columns: {e}")
                     # Only preserve if columns already exist, otherwise set to empty
                     if 'columns' not in table_slide:
                         table_slide['columns'] = []
@@ -2671,28 +2804,20 @@ class TemplateBuilder(QMainWindow):
 
     def _get_table_slide_data(self):
         """Get table slide data from template_data, with widget fallback"""
-        print(f"[DEBUG] _get_table_slide_data: Called")
         # First try to get from template_data (most reliable)
         table_slide = self.template_data.get('table_slide', {})
-        print(f"[DEBUG] _get_table_slide_data: table_slide from template_data: {table_slide.get('columns', 'NOT SET')}")
 
         # Get columns - prioritize template_data, then try widget
         saved_columns = table_slide.get('columns', [])
-        print(f"[DEBUG] _get_table_slide_data: saved_columns: {saved_columns}")
         if isinstance(saved_columns, list):
             # Use saved columns regardless of whether it's empty or not
             columns = saved_columns
-            print(f"[DEBUG] _get_table_slide_data: Using saved_columns: {columns}")
         else:
             # Try to get from widget as fallback (only if saved_columns is not a list)
-            print(f"[DEBUG] _get_table_slide_data: saved_columns not a list, trying widget fallback")
             try:
                 columns = self._get_selected_table_columns()
-                print(f"[DEBUG] _get_table_slide_data: Using widget_columns: {columns}")
-            except Exception as e:
-                print(f"[DEBUG] _get_table_slide_data: Exception getting widget columns: {e}")
+            except Exception:
                 columns = []
-                print(f"[DEBUG] _get_table_slide_data: Using empty list (exception): {columns}")
 
         # Build the data structure, using template_data values first
         result = {
@@ -2924,11 +3049,8 @@ class TemplateBuilder(QMainWindow):
 
     def save_template(self):
         """Save template to JSON file in PPTGenerator format"""
-        print(f"[DEBUG] save_template: Starting save")
-
         # Prevent re-entrant calls
         if hasattr(self, '_is_saving') and self._is_saving:
-            print(f"[DEBUG] save_template: Already saving, ignoring duplicate call")
             return
 
         self._is_saving = True
@@ -2936,7 +3058,6 @@ class TemplateBuilder(QMainWindow):
             # Save current component settings before saving template
             self._save_table_styling_to_template()
             self._save_chart_settings_to_template()
-            print(f"[DEBUG] save_template: After saving to template_data, columns are: {self.template_data.get('table_slide', {}).get('columns', 'NOT SET')}")
 
             # IMPORTANT: Also update the current slide's slide_settings to match template_data
             # This ensures that when the template is reloaded, the slide won't override with old data
@@ -2950,7 +3071,6 @@ class TemplateBuilder(QMainWindow):
                 # Update slide's settings to match the current template_data
                 if 'Table' in slide_type or self.selected_component_type == 'Table':
                     current_slide['slide_settings']['table'] = self.template_data.get('table_slide', {}).copy()
-                    print(f"[DEBUG] save_template: Updated slide {self.current_slide_index} table settings with columns: {current_slide['slide_settings']['table'].get('columns', 'NOT SET')}")
                 elif 'Chart' in slide_type or self.selected_component_type == 'Chart':
                     current_slide['slide_settings']['chart'] = self.template_data.get('chart_slide', {}).copy()
                 elif slide_type == 'Title Slide' or self.selected_component_type == 'Title Slide':
@@ -3037,10 +3157,8 @@ class TemplateBuilder(QMainWindow):
                 f"Slides: {len(self.template_data['slides'])}\n"
                 f"Format: PPTGenerator JSON"
             )
-            print(f"[DEBUG] save_template: Save completed successfully")
         finally:
             self._is_saving = False
-            print(f"[DEBUG] save_template: Cleared _is_saving flag")
 
     def load_template(self):
         """Load template from JSON file (supports PPTGenerator format)"""
@@ -3186,20 +3304,16 @@ class TemplateBuilder(QMainWindow):
                 
                 # Set selected columns - respect what user saved
                 selected_columns = table_slide.get('columns', [])
-                print(f"[DEBUG] load_template: Loaded columns from JSON: {selected_columns}")
                 # Ensure selected_columns is a list
                 if not isinstance(selected_columns, list):
                     selected_columns = []
-                    print(f"[DEBUG] load_template: Columns was not a list, using empty list: {selected_columns}")
 
                 # Only set checkboxes if the widget exists
                 if hasattr(self, 'table_columns_list') and self.table_columns_list:
                     try:
                         # Temporarily disconnect the signal to avoid triggering saves during load
                         self.table_columns_list.itemChanged.disconnect(self.on_table_slide_changed)
-                        print(f"[DEBUG] load_template: Disconnected itemChanged signal")
                     except:
-                        print(f"[DEBUG] load_template: Could not disconnect signal (not connected yet)")
                         pass  # Signal might not be connected yet
 
                     for i in range(self.table_columns_list.count()):
@@ -3208,10 +3322,8 @@ class TemplateBuilder(QMainWindow):
                             item_text = item.text()
                             if item_text in selected_columns:
                                 item.setCheckState(Qt.CheckState.Checked)
-                                print(f"[DEBUG] load_template: Set '{item_text}' to CHECKED")
                             else:
                                 item.setCheckState(Qt.CheckState.Unchecked)
-                                print(f"[DEBUG] load_template: Set '{item_text}' to UNCHECKED")
                     
                     # Reconnect the signal
                     try:
