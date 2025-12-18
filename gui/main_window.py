@@ -2047,8 +2047,9 @@ class MainWindow(QMainWindow):
                 category_rect = category_text.boundingRect()
                 category_text.setPos(bar_x + bar_width * 0.4 - category_rect.width() / 2, chart_y + chart_height + 5)
             
-            # Draw legend
-            self._draw_stacked_legend(df_pivot.columns.tolist(), colors, chart_x, chart_y, chart_width)
+            # Draw legend - position based on sort order
+            ascending = chart_settings.get('ascending', True)
+            self._draw_stacked_legend(df_pivot.columns.tolist(), colors, chart_x, chart_y, chart_width, chart_height, ascending)
         else:
             # Fallback to regular column chart
             self._draw_column_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
@@ -2116,16 +2117,40 @@ class MainWindow(QMainWindow):
                 category_rect = category_text.boundingRect()
                 category_text.setPos(chart_x + label_width - category_rect.width() - 5, bar_y + bar_height * 0.35 - category_rect.height() / 2)
             
-            # Draw legend at the top right
-            self._draw_stacked_legend(df_pivot.columns.tolist(), colors, chart_x, chart_y, chart_width)
+            # Draw legend - position based on sort order
+            ascending = chart_settings.get('ascending', True)
+            self._draw_stacked_legend(df_pivot.columns.tolist(), colors, chart_x, chart_y, chart_width, chart_height, ascending)
         else:
             # Fallback to regular bar chart
             self._draw_bar_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
 
-    def _draw_stacked_legend(self, series_names, colors, chart_x, chart_y, chart_width):
-        """Draw legend for stacked charts"""
+    def _draw_stacked_legend(self, series_names, colors, chart_x, chart_y, chart_width, chart_height=None, ascending=True):
+        """Draw legend for stacked charts
+        
+        Args:
+            series_names: List of series names
+            colors: List of colors
+            chart_x: Chart X position
+            chart_y: Chart Y position
+            chart_width: Chart width
+            chart_height: Chart height (optional, needed for bottom positioning)
+            ascending: Sort order - if True (ascending) legend at top, if False (descending) legend at bottom
+        """
         legend_x = chart_x + chart_width - 150
-        legend_y = chart_y + 10
+        
+        # Position legend based on sort order:
+        # - Ascending: legend at top (items go from small to large, largest at bottom)
+        # - Descending: legend at bottom (items go from large to small, largest at top)
+        if ascending:
+            legend_y = chart_y + 10  # Top position
+        else:
+            # Bottom position - calculate based on number of series
+            num_series = min(len(series_names), 6)
+            legend_height = num_series * 18
+            if chart_height:
+                legend_y = chart_y + chart_height - legend_height - 10
+            else:
+                legend_y = chart_y + 10  # Fallback to top if no height provided
         
         for i, name in enumerate(series_names[:6]):  # Max 6 series in legend
             # Legend color box

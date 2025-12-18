@@ -5,8 +5,8 @@
     "industry": "Fashion & Retail",
     "author": "ReportForge Template Builder",
     "version": "1.0",
-    "created_date": "2025-12-16",
-    "modified_date": "2025-12-16"
+    "created_date": "2025-12-18",
+    "modified_date": "2025-12-18"
   },
   "settings": {
     "page_size": "16:9",
@@ -79,7 +79,7 @@
       "y_column": "Medya Tür",
       "calculation": "sum",
       "sort_by": null,
-      "ascending": true,
+      "ascending": false,
       "top_n": null,
       "style": {
         "colors": [
@@ -196,7 +196,7 @@
           "y_column": "Firma",
           "calculation": "sum",
           "sort_by": "Toplam",
-          "ascending": true,
+          "ascending": false,
           "top_n": null,
           "style": {
             "colors": [
@@ -268,7 +268,7 @@
           "y_column": "Firma",
           "calculation": "sum",
           "sort_by": null,
-          "ascending": true,
+          "ascending": false,
           "top_n": null,
           "style": {
             "colors": [
@@ -340,7 +340,7 @@
           "y_column": "Medya Tür",
           "calculation": "sum",
           "sort_by": null,
-          "ascending": true,
+          "ascending": false,
           "top_n": null,
           "style": {
             "colors": [

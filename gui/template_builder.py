@@ -909,8 +909,8 @@ class TemplateBuilder(QMainWindow):
             if index >= 0:
                 self.table_sort_column_combo.setCurrentIndex(index)
         
-        # Set sort order
-        self.table_sort_order_combo.setCurrentIndex(0 if existing_sort_order else 1)
+        # Set sort order (index 0 = Descending, index 1 = Ascending)
+        self.table_sort_order_combo.setCurrentIndex(1 if existing_sort_order else 0)
         
         # Set group by
         if existing_group_by:
@@ -1268,8 +1268,8 @@ class TemplateBuilder(QMainWindow):
             if sort_index >= 0:
                 self.chart_sort_column_combo.setCurrentIndex(sort_index)
         
-        # Set sort order
-        self.chart_sort_order_combo.setCurrentIndex(0 if existing_ascending else 1)
+        # Set sort order (index 0 = Descending, index 1 = Ascending)
+        self.chart_sort_order_combo.setCurrentIndex(1 if existing_ascending else 0)
         
         # Set top N
         self.chart_top_n_spin.setValue(existing_top_n)
@@ -2359,10 +2359,25 @@ class TemplateBuilder(QMainWindow):
                 category_rect = category_item.boundingRect()
                 category_item.setPos(chart_x, bar_y_pos - category_rect.height() / 2)
 
-        # Legend for stacked charts
+        # Legend for stacked charts - position based on sort order
+        # Check sort order from UI
+        ascending = True  # Default
+        if hasattr(self, 'chart_sort_order_combo'):
+            ascending = self.chart_sort_order_combo.currentText() == "Ascending"
+        
         legend_x = chart_x + chart_width - 100
-        legend_y = chart_y + 10
         series_names = ["Series 1", "Series 2", "Series 3"]
+        
+        # Position legend based on sort order:
+        # - Ascending: legend at top (items go from small to large, largest at bottom)
+        # - Descending: legend at bottom (items go from large to small, largest at top)
+        if ascending:
+            legend_y = chart_y + 10  # Top position
+        else:
+            # Bottom position
+            legend_height = len(series_names) * 18
+            legend_y = chart_y + chart_height - legend_height - 10
+        
         for i, name in enumerate(series_names):
             legend_color = QColor(colors[i % len(colors)])
             
