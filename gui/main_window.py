@@ -1226,13 +1226,16 @@ class MainWindow(QMainWindow):
             
             # Define categorical columns that should be used as series for stacked charts
             categorical_columns = ['Medya Tür', 'Mecra Tipi', 'Yayın Tipi', 'Yayın Türü', 'Mecra',
-                                   'Duygu', 'Ton', 'Algı', 'Kategori', 'Şehir', 'Medya Kapsam']
+                                   'Duygu', 'Ton', 'Algı', 'Kategori', 'Şehir', 'Medya Kapsam',
+                                   'Bahis Ağırlığı', 'Görünürlük', 'Boyut',
+                                   'Medya Peryod', 'Medya İçerik', 'Kupür Tipi',
+                                   'Görsel Malzeme', 'Medya Grup Adı']
 
             # Check if y_column is a computed column
             is_computed_column = y_column_config in computed_column_names
             
-            # Handle stacked charts specially
-            if chart_type in ('stacked_bar', 'stacked_column'):
+            # Handle stacked and grouped charts specially
+            if chart_type in ('stacked_bar', 'stacked_column', 'grouped_bar', 'grouped_column'):
                 # Find if y_column is a categorical column (for series)
                 y_column = self._find_column(df_source, y_column_config)
                 is_categorical = y_column_config in categorical_columns or (
@@ -1241,7 +1244,8 @@ class MainWindow(QMainWindow):
                 
                 if is_categorical and y_column:
                     # Use y_column as series column and create pivoted data
-                    return self._get_stacked_chart_data(df_source, x_column, y_column, chart_settings)
+                    is_grouped = chart_type in ('grouped_bar', 'grouped_column')
+                    return self._get_stacked_chart_data(df_source, x_column, y_column, chart_settings, is_grouped=is_grouped)
             
             # Special case: if x_column and y_column are the same, use count (like Toplam)
             if x_column_config == y_column_config:
@@ -1409,19 +1413,20 @@ class MainWindow(QMainWindow):
             logger.warning(f"Error calculating computed column '{computed_column_name}': {e}")
             return None
 
-    def _get_stacked_chart_data(self, df_source, x_column, series_column, chart_settings):
+    def _get_stacked_chart_data(self, df_source, x_column, series_column, chart_settings, is_grouped=False):
         """
-        Get data for stacked charts (stacked_bar, stacked_column).
+        Get data for stacked or grouped charts (stacked_bar, stacked_column, grouped_bar, grouped_column).
         Returns a dict with pivoted DataFrame and metadata.
         
         Args:
             df_source: Source DataFrame
             x_column: Column for X-axis categories
-            series_column: Column for series (stacking)
+            series_column: Column for series (stacking/grouping)
             chart_settings: Chart configuration
+            is_grouped: If True, returns data for grouped chart instead of stacked
         
         Returns:
-            dict with 'df_pivot' (pivoted DataFrame), 'x_column', 'series_column', 'is_stacked'
+            dict with 'df_pivot' (pivoted DataFrame), 'x_column', 'series_column', 'is_stacked'/'is_grouped'
         """
         try:
             # Use crosstab to count occurrences - rows = x_column, columns = series_column
@@ -1453,17 +1458,19 @@ class MainWindow(QMainWindow):
                 df_pivot = df_pivot.head(top_n)
             # If no top_n specified, show all data (no limit)
             
-            logger.debug(f"Stacked chart data: {len(df_pivot)} rows, {len(df_pivot.columns)} series")
+            chart_type_name = "Grouped" if is_grouped else "Stacked"
+            logger.debug(f"{chart_type_name} chart data: {len(df_pivot)} rows, {len(df_pivot.columns)} series")
             
             return {
                 'df_pivot': df_pivot,
                 'x_column': x_column,
                 'series_column': series_column,
-                'is_stacked': True
+                'is_stacked': not is_grouped,
+                'is_grouped': is_grouped
             }
             
         except Exception as e:
-            logger.warning(f"Error creating stacked chart data: {e}")
+            logger.warning(f"Error creating stacked/grouped chart data: {e}")
             return None
 
     def _add_computed_columns_to_table(self, df_source, df_grouped, group_by, computed_columns):
@@ -1708,6 +1715,10 @@ class MainWindow(QMainWindow):
             self._draw_stacked_column_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
         elif chart_type == 'stacked_bar':
             self._draw_stacked_bar_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+        elif chart_type == 'grouped_column':
+            self._draw_grouped_column_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+        elif chart_type == 'grouped_bar':
+            self._draw_grouped_bar_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
         else:
             self._draw_placeholder_chart(chart_type, chart_x, chart_y, chart_width, chart_height, colors)
 
@@ -2165,6 +2176,141 @@ class MainWindow(QMainWindow):
             legend_text = self.slide_scene.addText(str(name)[:15], QFont("Calibri", 8))
             legend_text.setDefaultTextColor(QColor("#374151"))
             legend_text.setPos(legend_x + 16, legend_y + i * 18 - 2)
+
+    def _draw_grouped_column_chart_with_data(self, data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
+        """Draw grouped column chart with real data - bars side by side"""
+        # Check if data is grouped format (dict with df_pivot) or regular DataFrame
+        if isinstance(data, dict) and data.get('is_grouped'):
+            df_pivot = data['df_pivot']
+            categories = df_pivot.index.tolist()
+            series_names = df_pivot.columns.tolist()
+            
+            num_categories = len(categories)
+            num_series = len(series_names)
+            
+            if num_categories == 0 or num_series == 0:
+                return
+            
+            # Calculate dimensions
+            group_width = chart_width / (num_categories + 1)
+            bar_width = group_width / (num_series + 1)
+            max_val = df_pivot.values.max()
+            if max_val == 0:
+                max_val = 1
+            
+            # Font sizes based on number of categories
+            category_font_size = max(6, 10 - num_categories // 4)
+            value_font_size = max(5, 8 - num_categories // 5)
+            
+            for i, category in enumerate(categories):
+                group_x = chart_x + (i + 0.5) * group_width
+                
+                # Draw bars side by side within each group
+                for j, series in enumerate(series_names):
+                    value = df_pivot.loc[category, series]
+                    bar_height = (value / max_val) * chart_height * 0.8
+                    
+                    color = QColor(colors[j % len(colors)])
+                    bar_x = group_x + (j - num_series / 2 + 0.5) * bar_width
+                    
+                    self.slide_scene.addRect(
+                        bar_x - bar_width * 0.4, chart_y + chart_height - bar_height,
+                        bar_width * 0.8, bar_height,
+                        color, color
+                    )
+                    
+                    # Value label on top if space allows
+                    if value > 0 and bar_width > 15:
+                        val_text = self.slide_scene.addText(str(int(value)), QFont("Calibri", value_font_size))
+                        val_text.setDefaultTextColor(QColor("#374151"))
+                        val_rect = val_text.boundingRect()
+                        val_text.setPos(
+                            bar_x - val_rect.width() / 2,
+                            chart_y + chart_height - bar_height - val_rect.height() - 2
+                        )
+                
+                # Category label below
+                cat_text = str(category)
+                max_chars = max(4, int(group_width / 7))
+                if len(cat_text) > max_chars:
+                    cat_text = cat_text[:max_chars-1] + ".."
+                category_text = self.slide_scene.addText(cat_text, QFont("Calibri", category_font_size))
+                category_text.setDefaultTextColor(QColor("#374151"))
+                category_rect = category_text.boundingRect()
+                category_text.setPos(group_x - category_rect.width() / 2, chart_y + chart_height + 5)
+            
+            # Draw legend
+            ascending = chart_settings.get('ascending', True)
+            self._draw_stacked_legend(series_names, colors, chart_x, chart_y, chart_width, chart_height, ascending)
+        else:
+            # Fallback to regular column chart
+            self._draw_column_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+
+    def _draw_grouped_bar_chart_with_data(self, data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
+        """Draw grouped horizontal bar chart with real data - bars side by side"""
+        # Check if data is grouped format (dict with df_pivot) or regular DataFrame
+        if isinstance(data, dict) and data.get('is_grouped'):
+            df_pivot = data['df_pivot']
+            categories = df_pivot.index.tolist()
+            series_names = df_pivot.columns.tolist()
+            
+            num_categories = len(categories)
+            num_series = len(series_names)
+            
+            if num_categories == 0 or num_series == 0:
+                return
+            
+            # Calculate dimensions
+            group_height = chart_height / (num_categories + 1)
+            bar_height = group_height / (num_series + 1)
+            max_val = df_pivot.values.max()
+            if max_val == 0:
+                max_val = 1
+            
+            # Reserve space for category labels on the left
+            label_width = 80
+            available_width = chart_width - label_width
+            
+            # Font sizes based on number of categories
+            category_font_size = max(6, 10 - num_categories // 4)
+            value_font_size = max(5, 8 - num_categories // 5)
+            
+            for i, category in enumerate(categories):
+                group_y = chart_y + (i + 0.5) * group_height
+                
+                # Draw bars side by side within each group
+                for j, series in enumerate(series_names):
+                    value = df_pivot.loc[category, series]
+                    bar_w = (value / max_val) * available_width * 0.9
+                    
+                    color = QColor(colors[j % len(colors)])
+                    bar_y = group_y + (j - num_series / 2 + 0.5) * bar_height
+                    
+                    self.slide_scene.addRect(
+                        chart_x + label_width, bar_y - bar_height * 0.4,
+                        bar_w, bar_height * 0.8,
+                        color, color
+                    )
+                    
+                    # Value label at end if space allows
+                    if value > 0 and bar_height > 10:
+                        val_text = self.slide_scene.addText(str(int(value)), QFont("Calibri", value_font_size))
+                        val_text.setDefaultTextColor(QColor("#374151"))
+                        val_text.setPos(chart_x + label_width + bar_w + 5, bar_y - bar_height * 0.4)
+                
+                # Category label on the left
+                cat_text = str(category)[:12]
+                category_text = self.slide_scene.addText(cat_text, QFont("Calibri", category_font_size))
+                category_text.setDefaultTextColor(QColor("#374151"))
+                category_rect = category_text.boundingRect()
+                category_text.setPos(chart_x + label_width - category_rect.width() - 5, group_y - category_rect.height() / 2)
+            
+            # Draw legend
+            ascending = chart_settings.get('ascending', True)
+            self._draw_stacked_legend(series_names, colors, chart_x, chart_y, chart_width, chart_height, ascending)
+        else:
+            # Fallback to regular bar chart
+            self._draw_bar_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
 
     def _draw_placeholder_chart(self, chart_type, chart_x, chart_y, chart_width, chart_height, colors):
         """Draw placeholder chart when no data available"""
