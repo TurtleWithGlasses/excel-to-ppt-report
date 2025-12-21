@@ -894,6 +894,15 @@ class MainWindow(QMainWindow):
             self._render_table_slide_preview(slide_config)
         elif slide_type == 'Chart Slide':
             self._render_chart_slide_preview(slide_config)
+        elif slide_type == 'Blank Slide':
+            # Blank slide can have chart, table, or both - check slide_settings
+            slide_settings = slide_config.get('slide_settings', {})
+            if 'chart' in slide_settings:
+                self._render_chart_slide_preview(slide_config)
+            elif 'table' in slide_settings:
+                self._render_table_slide_preview(slide_config)
+            else:
+                self._render_content_slide_preview(slide_config)
         else:
             # Generic content slide
             self._render_content_slide_preview(slide_config)
@@ -1000,10 +1009,10 @@ class MainWindow(QMainWindow):
         colors = chart_style.get('colors', ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'])
 
         # Render chart based on type
-        # Check if chart_data is a dict (stacked chart) or DataFrame (regular chart)
+        # Check if chart_data is a dict (stacked/grouped chart) or DataFrame (regular chart)
         if chart_data is not None:
-            if isinstance(chart_data, dict) and chart_data.get('is_stacked'):
-                # Stacked chart data - pass the whole dict
+            if isinstance(chart_data, dict) and (chart_data.get('is_stacked') or chart_data.get('is_grouped')):
+                # Stacked or grouped chart data - pass the whole dict
                 df_pivot = chart_data.get('df_pivot')
                 if df_pivot is not None and not df_pivot.empty:
                     self._draw_data_chart(chart_data, chart_type, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
