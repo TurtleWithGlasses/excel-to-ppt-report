@@ -5,8 +5,8 @@
     "industry": "Fashion & Retail",
     "author": "ReportForge Template Builder",
     "version": "1.0",
-    "created_date": "2025-12-18",
-    "modified_date": "2025-12-18"
+    "created_date": "2025-12-20",
+    "modified_date": "2025-12-20"
   },
   "settings": {
     "page_size": "16:9",
@@ -42,25 +42,18 @@
     "table_slide": {
       "title": "Örnek",
       "subtitle": "",
-      "columns": [
-        "Kurum",
-        "Toplam",
-        "Erişim",
-        "StxCm",
-        "Reklam Eşdeğeri",
-        "Net Etki"
-      ],
-      "sort_by": "Toplam",
-      "ascending": true,
-      "group_by": "Firma",
+      "columns": [],
+      "sort_by": null,
+      "ascending": false,
+      "group_by": null,
       "note": "",
       "style": {
         "font_name": "Calibri",
         "font_size": 11,
-        "header_color": "#550000",
+        "header_color": "#2563EB",
         "header_text_color": "#00FF00",
-        "row_color_1": "#000000",
-        "row_color_2": "#BABABA",
+        "row_color_1": "#FFFFFF",
+        "row_color_2": "#F9FAFB",
         "text_color": "#AA0000",
         "background_color": "#0000FF",
         "header_alignment": "Center",
@@ -73,12 +66,12 @@
       }
     },
     "chart_slide": {
-      "chart_type": "stacked_bar",
-      "title": "Yansıma Sayısı Medya Türüne Göre Dağılım",
+      "chart_type": "grouped_bar",
+      "title": "Algıya Göre Dağılım",
       "x_column": "Firma",
-      "y_column": "Medya Tür",
+      "y_column": "Bahis Ağırlığı",
       "calculation": "sum",
-      "sort_by": null,
+      "sort_by": "Firma",
       "ascending": false,
       "top_n": null,
       "style": {
@@ -193,7 +186,7 @@
           "chart_type": "column",
           "title": "Yansıma Sayısı",
           "x_column": "Firma",
-          "y_column": "Firma",
+          "y_column": "Toplam",
           "calculation": "sum",
           "sort_by": "Toplam",
           "ascending": false,
@@ -229,7 +222,7 @@
           "chart_type": "bar",
           "title": "Yansıma Sayısı",
           "x_column": "Firma",
-          "y_column": "Firma",
+          "y_column": "Toplam",
           "calculation": "sum",
           "sort_by": "Toplam",
           "ascending": false,
@@ -265,7 +258,7 @@
           "chart_type": "pie",
           "title": "Yansıma Sayısı Yüzdelik Dağılım",
           "x_column": "Firma",
-          "y_column": "Firma",
+          "y_column": "Toplam",
           "calculation": "sum",
           "sort_by": null,
           "ascending": false,
@@ -301,7 +294,7 @@
           "chart_type": "line",
           "title": "",
           "x_column": "Firma",
-          "y_column": "Firma",
+          "y_column": "Toplam",
           "calculation": "sum",
           "sort_by": null,
           "ascending": false,
@@ -329,17 +322,158 @@
       }
     },
     {
-      "name": "grafik5",
+      "name": "algı",
       "type": "Chart Slide",
       "components": [],
       "slide_settings": {
         "chart": {
-          "chart_type": "stacked_bar",
-          "title": "Yansıma Sayısı Medya Türüne Göre Dağılım",
+          "chart_type": "grouped_column",
+          "title": "Algıya Göre Dağılım",
           "x_column": "Firma",
-          "y_column": "Medya Tür",
+          "y_column": "Algı",
           "calculation": "sum",
-          "sort_by": null,
+          "sort_by": "Toplam",
+          "ascending": false,
+          "top_n": null,
+          "style": {
+            "colors": [
+              "#2563EB",
+              "#10B981",
+              "#F59E0B",
+              "#EF4444",
+              "#8B5CF6",
+              "#06B6D4",
+              "#EC4899",
+              "#84CC16"
+            ],
+            "show_values": true,
+            "grid": true,
+            "legend_position": "none",
+            "font_name": "Calibri",
+            "font_size": 11,
+            "x_label": "",
+            "y_label": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "algı bazında kıyaslama",
+      "type": "Chart Slide",
+      "components": [],
+      "slide_settings": {
+        "chart": {
+          "chart_type": "grouped_bar",
+          "title": "Algıya Göre Dağılım",
+          "x_column": "Firma",
+          "y_column": "Algı",
+          "calculation": "sum",
+          "sort_by": "Toplam",
+          "ascending": false,
+          "top_n": null,
+          "style": {
+            "colors": [
+              "#2563EB",
+              "#10B981",
+              "#F59E0B",
+              "#EF4444",
+              "#8B5CF6",
+              "#06B6D4",
+              "#EC4899",
+              "#84CC16"
+            ],
+            "show_values": true,
+            "grid": true,
+            "legend_position": "none",
+            "font_name": "Calibri",
+            "font_size": 11,
+            "x_label": "",
+            "y_label": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "Bahis ağırlığı kıyaslama",
+      "type": "Blank Slide",
+      "components": [],
+      "slide_settings": {
+        "chart": {
+          "chart_type": "grouped_bar",
+          "title": "Algıya Göre Dağılım",
+          "x_column": "Firma",
+          "y_column": "Bahis Ağırlığı",
+          "calculation": "sum",
+          "sort_by": "Firma",
+          "ascending": false,
+          "top_n": null,
+          "style": {
+            "colors": [
+              "#2563EB",
+              "#10B981",
+              "#F59E0B",
+              "#EF4444",
+              "#8B5CF6",
+              "#06B6D4",
+              "#EC4899",
+              "#84CC16"
+            ],
+            "show_values": true,
+            "grid": true,
+            "legend_position": "none",
+            "font_name": "Calibri",
+            "font_size": 11,
+            "x_label": "",
+            "y_label": ""
+          }
+        },
+        "table": {
+          "title": "Örnek",
+          "subtitle": "",
+          "columns": [
+            "Kurum",
+            "Toplam",
+            "Erişim",
+            "StxCm",
+            "Reklam Eşdeğeri",
+            "Net Etki"
+          ],
+          "sort_by": "Toplam",
+          "ascending": true,
+          "group_by": "Firma",
+          "note": "",
+          "style": {
+            "font_name": "Calibri",
+            "font_size": 11,
+            "header_color": "#2563EB",
+            "header_text_color": "#00FF00",
+            "row_color_1": "#FFFFFF",
+            "row_color_2": "#F9FAFB",
+            "text_color": "#AA0000",
+            "background_color": "#0000FF",
+            "header_alignment": "Center",
+            "text_alignment": "Center",
+            "header_bold": true,
+            "header_italic": false,
+            "text_bold": true,
+            "text_italic": true,
+            "border_color": "#FFFFFF"
+          }
+        }
+      }
+    },
+    {
+      "name": "Boyuta göre dağılım",
+      "type": "Chart Slide",
+      "components": [],
+      "slide_settings": {
+        "chart": {
+          "chart_type": "grouped_column",
+          "title": "Bahis Ağırlığına Göre Dağılım",
+          "x_column": "Firma",
+          "y_column": "Boyut",
+          "calculation": "sum",
+          "sort_by": "Firma",
           "ascending": false,
           "top_n": null,
           "style": {
