@@ -14,12 +14,16 @@ import matplotlib
 import os
 import tempfile
 import warnings
+import logging
 
 # Use non-interactive backend for server environments
 matplotlib.use('Agg')
 
 # Suppress matplotlib tight_layout warnings
 warnings.filterwarnings('ignore', message='.*Tight layout.*')
+
+# Configure logging for this module
+logger = logging.getLogger(__name__)
 
 
 class ChartComponent(BaseComponent):
@@ -77,7 +81,7 @@ class ChartComponent(BaseComponent):
         # Chart styling
         self.colors = self.style.get('colors', 'default')
         self.legend_position = self.style.get('legend_position', 'bottom')
-        self.show_values = self.style.get('show_values', False)
+        self.show_values = self.style.get('show_values', True)  # Default to True - show labels
         self.chart_title = self.style.get('title', '')
         self.x_label = self.style.get('x_label', '')
         self.y_label = self.style.get('y_label', '')
@@ -157,7 +161,6 @@ class ChartComponent(BaseComponent):
             pd.DataFrame or None
         """
         if data is None:
-            print("[DEBUG] _prepare_data: data is None")
             return None
 
         # Convert to DataFrame
@@ -172,18 +175,13 @@ class ChartComponent(BaseComponent):
         else:
             return None
 
-        print(f"[DEBUG] _prepare_data: DataFrame shape: {df.shape}, columns: {df.columns.tolist()}")
-        print(f"[DEBUG] _prepare_data: x_column={self.x_column}, y_column={self.y_column}, series_column={self.series_column}")
-
         # Filter columns if specified
         required_cols = [self.x_column, self.y_column]
         if self.series_column:
             required_cols.append(self.series_column)
 
         available_cols = [col for col in required_cols if col and col in df.columns]
-        print(f"[DEBUG] _prepare_data: required_cols={required_cols}, available_cols={available_cols}")
         if not available_cols:
-            print("[DEBUG] _prepare_data: No available columns, returning None")
             return None
 
         # Drop rows with NaN in critical columns
@@ -195,7 +193,6 @@ class ChartComponent(BaseComponent):
 
         # Check if we have any data left
         if df.empty:
-            print("[DEBUG] _prepare_data: DataFrame is empty after dropna")
             return None
 
         # Apply sorting
@@ -206,7 +203,6 @@ class ChartComponent(BaseComponent):
         if self.top_n and self.top_n > 0:
             df = df.head(self.top_n)
 
-        print(f"[DEBUG] _prepare_data: Final DataFrame shape: {df.shape}")
         return df
 
     def _generate_chart(self, df: pd.DataFrame) -> Optional[str]:
@@ -220,29 +216,6 @@ class ChartComponent(BaseComponent):
             str: Path to temporary image file
         """
         try:
-            # Debug: Show what data we're working with
-            print(f"[DEBUG] _generate_chart: chart_type={self.chart_type}, x_column={self.x_column}, y_column={self.y_column}, series_column={self.series_column}")
-            print(f"[DEBUG] _generate_chart: DataFrame columns: {df.columns.tolist()}")
-            if self.y_column and self.y_column in df.columns:
-                print(f"[DEBUG] _generate_chart: y_column dtype: {df[self.y_column].dtype}, sample values: {df[self.y_column].head(3).tolist()}")
-
-            # Validate y_column is numeric for non-stacked/grouped charts
-            # For stacked/grouped charts, the individual methods handle this
-            if self.chart_type in [self.CHART_COLUMN, self.CHART_BAR, self.CHART_LINE]:
-                if self.y_column and self.y_column in df.columns:
-                    if not pd.api.types.is_numeric_dtype(df[self.y_column]):
-                        print(f"[DEBUG] _generate_chart: y_column '{self.y_column}' is not numeric, attempting to convert or use count")
-                        # Try to convert to numeric
-                        try:
-                            df[self.y_column] = pd.to_numeric(df[self.y_column], errors='coerce')
-                            df = df.dropna(subset=[self.y_column])
-                            if df.empty:
-                                print("[DEBUG] _generate_chart: All values became NaN after conversion, cannot generate chart")
-                                return None
-                        except Exception as conv_err:
-                            print(f"[DEBUG] _generate_chart: Could not convert y_column to numeric: {conv_err}")
-                            return None
-
             # Set figure size based on component dimensions (limit to reasonable values)
             # Ensure we have valid numeric values
             try:
@@ -252,7 +225,7 @@ class ChartComponent(BaseComponent):
                 raw_width = 9.0
                 raw_height = 5.0
 
-            # Clamp to reasonable bounds
+            # Clamp to reasonable bounds - FORCE to safe values
             if raw_width > 20.0 or raw_width < 1.0:
                 fig_width = 20.0 if raw_width > 20.0 else 9.0
             else:
@@ -264,7 +237,7 @@ class ChartComponent(BaseComponent):
                 fig_height = raw_height
 
             # Use lower DPI to prevent huge images
-            dpi = 100
+            dpi = 100  # Reduced from 150
 
             # Check if resulting image would be too large (max 2^16 = 65536)
             max_pixels = 10000  # Conservative limit
@@ -323,10 +296,18 @@ class ChartComponent(BaseComponent):
             return temp_path
 
         except Exception as e:
-            print(f"Error generating chart: {e}")
+            logger.warning(f"Error generating chart: {e}")
             if 'fig' in locals():
                 plt.close(fig)
             return None
+
+    def _format_value(self, v) -> str:
+        """Safely format a value for display on chart, handling non-numeric types."""
+        try:
+            numeric_val = float(v)
+            return f'{numeric_val:,.0f}'
+        except (ValueError, TypeError):
+            return str(v)
 
     def _create_column_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create vertical column chart."""
@@ -337,21 +318,17 @@ class ChartComponent(BaseComponent):
                 index=self.x_column,
                 columns=self.series_column,
                 aggfunc='sum'
-            )
+            ).fillna(0)
             df_pivot.plot(kind='bar', ax=ax, color=colors, width=0.7)
         else:
-            # Single series
+            # Single series - ensure y_data is numeric
             x_data = df[self.x_column].astype(str)
-            y_data = df[self.y_column]
+            y_data = pd.to_numeric(df[self.y_column], errors='coerce').fillna(0)
             ax.bar(x_data, y_data, color=colors[0] if colors else None, width=0.6)
 
             if self.show_values:
                 for i, v in enumerate(y_data):
-                    try:
-                        label = f'{float(v):,.0f}'
-                    except (ValueError, TypeError):
-                        label = str(v)
-                    ax.text(i, v, label, ha='center', va='bottom', fontsize=8)
+                    ax.text(i, v, self._format_value(v), ha='center', va='bottom', fontsize=8)
 
     def _create_bar_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create horizontal bar chart."""
@@ -362,40 +339,96 @@ class ChartComponent(BaseComponent):
                 index=self.x_column,
                 columns=self.series_column,
                 aggfunc='sum'
-            )
+            ).fillna(0)
             df_pivot.plot(kind='barh', ax=ax, color=colors, height=0.7)
         else:
-            # Single series
+            # Single series - ensure y_data is numeric
             x_data = df[self.x_column].astype(str)
-            y_data = df[self.y_column]
+            y_data = pd.to_numeric(df[self.y_column], errors='coerce').fillna(0)
             ax.barh(x_data, y_data, color=colors[0] if colors else None, height=0.6)
 
             if self.show_values:
                 for i, v in enumerate(y_data):
-                    try:
-                        label = f'{float(v):,.0f}'
-                    except (ValueError, TypeError):
-                        label = str(v)
-                    ax.text(v, i, label, ha='left', va='center', fontsize=8)
+                    ax.text(v, i, self._format_value(v), ha='left', va='center', fontsize=8)
 
     def _create_pie_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
-        """Create pie chart."""
+        """Create pie chart with labels showing category, value, and percentage outside the pie."""
         labels = df[self.x_column].astype(str) if self.x_column else df.index
-        values = df[self.y_column]
+        # Ensure values are numeric for pie chart
+        values = pd.to_numeric(df[self.y_column], errors='coerce').fillna(0)
 
+        # Handle edge case where all values are 0 or negative
+        if values.sum() <= 0:
+            # Replace with equal slices to avoid divide by zero
+            values = pd.Series([1] * len(values), index=values.index)
+            logger.debug("Pie chart: All values were zero, using equal slices")
+
+        # Calculate total for percentage labels
+        total = values.sum()
+        num_slices = len(values)
+
+        # Adjust font sizes based on number of slices
+        label_fontsize = max(7, 10 - num_slices // 3)
+        pct_fontsize = max(6, 9 - num_slices // 3)
+
+        # Create custom label function that shows category, value and percentage
+        def make_label_func(labels_list, values_list):
+            idx = [0]  # Use list to maintain state across calls
+            def label_func(pct):
+                i = idx[0]
+                idx[0] += 1
+                if i < len(labels_list) and i < len(values_list):
+                    cat = str(labels_list.iloc[i]) if hasattr(labels_list, 'iloc') else str(labels_list[i])
+                    val = values_list.iloc[i] if hasattr(values_list, 'iloc') else values_list[i]
+                    # Truncate long category names
+                    if len(cat) > 12:
+                        cat = cat[:10] + ".."
+                    return f'{cat}\n{val:,.0f} ({pct:.1f}%)'
+                return f'{pct:.1f}%'
+            return label_func
+
+        # Draw pie with labels outside
         wedges, texts, autotexts = ax.pie(
             values,
-            labels=labels,
+            labels=None,  # Don't use built-in labels
             colors=colors,
-            autopct='%1.1f%%' if self.show_values else None,
-            startangle=90
+            autopct=make_label_func(labels, values) if self.show_values else None,
+            startangle=90,
+            pctdistance=1.25,  # Place labels outside the pie
+            labeldistance=1.35
         )
 
-        # Style percentages
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontsize(9)
-            autotext.set_weight('bold')
+        # Style the percentage/label texts (these are outside the pie)
+        if autotexts:
+            for i, autotext in enumerate(autotexts):
+                autotext.set_fontsize(label_fontsize)
+                autotext.set_color('#1F2937')  # Dark text for outside labels
+                autotext.set_weight('normal')
+
+                # Adjust horizontal alignment based on position
+                angle = autotext.get_position()
+                x_pos = autotext.get_position()[0]
+                if x_pos < 0:
+                    autotext.set_horizontalalignment('right')
+                else:
+                    autotext.set_horizontalalignment('left')
+
+        # Add a legend on the right side as backup for small slices
+        if num_slices > 5:
+            # Create legend with category names and values
+            legend_labels = []
+            for i in range(len(labels)):
+                cat = str(labels.iloc[i]) if hasattr(labels, 'iloc') else str(labels[i])
+                val = values.iloc[i] if hasattr(values, 'iloc') else values[i]
+                pct = (val / total) * 100
+                if len(cat) > 15:
+                    cat = cat[:13] + ".."
+                legend_labels.append(f'{cat}: {val:,.0f} ({pct:.1f}%)')
+
+            ax.legend(wedges, legend_labels,
+                     loc='center left',
+                     bbox_to_anchor=(1.0, 0.5),
+                     fontsize=max(6, 8 - num_slices // 4))
 
         ax.axis('equal')
 
@@ -406,31 +439,30 @@ class ChartComponent(BaseComponent):
             for idx, series_name in enumerate(df[self.series_column].unique()):
                 series_data = df[df[self.series_column] == series_name]
                 color = colors[idx % len(colors)] if colors else None
+                y_values = pd.to_numeric(series_data[self.y_column], errors='coerce').fillna(0)
                 ax.plot(
                     series_data[self.x_column],
-                    series_data[self.y_column],
+                    y_values,
                     marker='o',
                     label=series_name,
                     color=color,
                     linewidth=2
                 )
         else:
-            # Single series
+            # Single series - ensure y_data is numeric
+            x_data = df[self.x_column]
+            y_data = pd.to_numeric(df[self.y_column], errors='coerce').fillna(0)
             ax.plot(
-                df[self.x_column],
-                df[self.y_column],
+                x_data,
+                y_data,
                 marker='o',
                 color=colors[0] if colors else None,
                 linewidth=2
             )
 
             if self.show_values:
-                for x, y in zip(df[self.x_column], df[self.y_column]):
-                    try:
-                        label = f'{float(y):,.0f}'
-                    except (ValueError, TypeError):
-                        label = str(y)
-                    ax.text(x, y, label, ha='center', va='bottom', fontsize=8)
+                for x, y in zip(x_data, y_data):
+                    ax.text(x, y, self._format_value(y), ha='center', va='bottom', fontsize=8)
 
     def _create_stacked_column_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create stacked vertical column chart."""
@@ -439,26 +471,12 @@ class ChartComponent(BaseComponent):
             self._create_column_chart(ax, df, colors)
             return
 
-        # Check if y_column exists and is numeric
-        y_is_numeric = False
-        if self.y_column and self.y_column in df.columns:
-            y_is_numeric = pd.api.types.is_numeric_dtype(df[self.y_column])
-
-        if y_is_numeric:
-            df_pivot = df.pivot_table(
-                values=self.y_column,
-                index=self.x_column,
-                columns=self.series_column,
-                aggfunc='sum'
-            ).fillna(0)
-        else:
-            # Use count aggregation for non-numeric y_column
-            df_pivot = df.pivot_table(
-                index=self.x_column,
-                columns=self.series_column,
-                aggfunc='size'
-            ).fillna(0)
-
+        df_pivot = df.pivot_table(
+            values=self.y_column,
+            index=self.x_column,
+            columns=self.series_column,
+            aggfunc='sum'
+        ).fillna(0)  # Fill NaN values from missing combinations
         df_pivot.plot(kind='bar', stacked=True, ax=ax, color=colors, width=0.7)
 
     def _create_stacked_bar_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
@@ -468,27 +486,13 @@ class ChartComponent(BaseComponent):
             self._create_bar_chart(ax, df, colors)
             return
 
-        # Check if y_column exists and is numeric
-        y_is_numeric = False
-        if self.y_column and self.y_column in df.columns:
-            y_is_numeric = pd.api.types.is_numeric_dtype(df[self.y_column])
-
-        if y_is_numeric:
-            df_pivot = df.pivot_table(
-                values=self.y_column,
-                index=self.x_column,
-                columns=self.series_column,
-                aggfunc='sum'
-            ).fillna(0)
-        else:
-            # Use count aggregation for non-numeric y_column
-            df_pivot = df.pivot_table(
-                index=self.x_column,
-                columns=self.series_column,
-                aggfunc='size'
-            ).fillna(0)
-
-        df_pivot.plot(kind='barh', stacked=True, ax=ax, color=colors, height=0.7)
+        df_pivot = df.pivot_table(
+            values=self.y_column,
+            index=self.x_column,
+            columns=self.series_column,
+            aggfunc='sum'
+        ).fillna(0)  # Fill NaN values from missing combinations
+        df_pivot.plot(kind='barh', stacked=True, ax=ax, color=colors)
 
     def _create_grouped_column_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
         """Create grouped vertical column chart - bars side by side."""
@@ -497,27 +501,12 @@ class ChartComponent(BaseComponent):
             self._create_column_chart(ax, df, colors)
             return
 
-        # Check if y_column exists and is numeric
-        y_is_numeric = False
-        if self.y_column and self.y_column in df.columns:
-            y_is_numeric = pd.api.types.is_numeric_dtype(df[self.y_column])
-
-        if y_is_numeric:
-            # Use sum aggregation for numeric y_column
-            df_pivot = df.pivot_table(
-                values=self.y_column,
-                index=self.x_column,
-                columns=self.series_column,
-                aggfunc='sum'
-            ).fillna(0)
-        else:
-            # Use count aggregation for non-numeric or missing y_column
-            df_pivot = df.pivot_table(
-                index=self.x_column,
-                columns=self.series_column,
-                aggfunc='size'
-            ).fillna(0)
-
+        df_pivot = df.pivot_table(
+            values=self.y_column,
+            index=self.x_column,
+            columns=self.series_column,
+            aggfunc='sum'
+        ).fillna(0)
         df_pivot.plot(kind='bar', stacked=False, ax=ax, color=colors, width=0.8)
 
         # Rotate x-axis labels for better readability
@@ -530,27 +519,12 @@ class ChartComponent(BaseComponent):
             self._create_bar_chart(ax, df, colors)
             return
 
-        # Check if y_column exists and is numeric
-        y_is_numeric = False
-        if self.y_column and self.y_column in df.columns:
-            y_is_numeric = pd.api.types.is_numeric_dtype(df[self.y_column])
-
-        if y_is_numeric:
-            # Use sum aggregation for numeric y_column
-            df_pivot = df.pivot_table(
-                values=self.y_column,
-                index=self.x_column,
-                columns=self.series_column,
-                aggfunc='sum'
-            ).fillna(0)
-        else:
-            # Use count aggregation for non-numeric or missing y_column
-            df_pivot = df.pivot_table(
-                index=self.x_column,
-                columns=self.series_column,
-                aggfunc='size'
-            ).fillna(0)
-
+        df_pivot = df.pivot_table(
+            values=self.y_column,
+            index=self.x_column,
+            columns=self.series_column,
+            aggfunc='sum'
+        ).fillna(0)
         df_pivot.plot(kind='barh', stacked=False, ax=ax, color=colors, height=0.8)
 
     def _get_colors(self, df: pd.DataFrame) -> List[str]:
