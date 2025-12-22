@@ -157,6 +157,7 @@ class ChartComponent(BaseComponent):
             pd.DataFrame or None
         """
         if data is None:
+            print("[DEBUG] _prepare_data: data is None")
             return None
 
         # Convert to DataFrame
@@ -171,13 +172,18 @@ class ChartComponent(BaseComponent):
         else:
             return None
 
+        print(f"[DEBUG] _prepare_data: DataFrame shape: {df.shape}, columns: {df.columns.tolist()}")
+        print(f"[DEBUG] _prepare_data: x_column={self.x_column}, y_column={self.y_column}, series_column={self.series_column}")
+
         # Filter columns if specified
         required_cols = [self.x_column, self.y_column]
         if self.series_column:
             required_cols.append(self.series_column)
 
         available_cols = [col for col in required_cols if col and col in df.columns]
+        print(f"[DEBUG] _prepare_data: required_cols={required_cols}, available_cols={available_cols}")
         if not available_cols:
+            print("[DEBUG] _prepare_data: No available columns, returning None")
             return None
 
         # Drop rows with NaN in critical columns
@@ -189,6 +195,7 @@ class ChartComponent(BaseComponent):
 
         # Check if we have any data left
         if df.empty:
+            print("[DEBUG] _prepare_data: DataFrame is empty after dropna")
             return None
 
         # Apply sorting
@@ -199,6 +206,7 @@ class ChartComponent(BaseComponent):
         if self.top_n and self.top_n > 0:
             df = df.head(self.top_n)
 
+        print(f"[DEBUG] _prepare_data: Final DataFrame shape: {df.shape}")
         return df
 
     def _generate_chart(self, df: pd.DataFrame) -> Optional[str]:
@@ -212,6 +220,29 @@ class ChartComponent(BaseComponent):
             str: Path to temporary image file
         """
         try:
+            # Debug: Show what data we're working with
+            print(f"[DEBUG] _generate_chart: chart_type={self.chart_type}, x_column={self.x_column}, y_column={self.y_column}, series_column={self.series_column}")
+            print(f"[DEBUG] _generate_chart: DataFrame columns: {df.columns.tolist()}")
+            if self.y_column and self.y_column in df.columns:
+                print(f"[DEBUG] _generate_chart: y_column dtype: {df[self.y_column].dtype}, sample values: {df[self.y_column].head(3).tolist()}")
+
+            # Validate y_column is numeric for non-stacked/grouped charts
+            # For stacked/grouped charts, the individual methods handle this
+            if self.chart_type in [self.CHART_COLUMN, self.CHART_BAR, self.CHART_LINE]:
+                if self.y_column and self.y_column in df.columns:
+                    if not pd.api.types.is_numeric_dtype(df[self.y_column]):
+                        print(f"[DEBUG] _generate_chart: y_column '{self.y_column}' is not numeric, attempting to convert or use count")
+                        # Try to convert to numeric
+                        try:
+                            df[self.y_column] = pd.to_numeric(df[self.y_column], errors='coerce')
+                            df = df.dropna(subset=[self.y_column])
+                            if df.empty:
+                                print("[DEBUG] _generate_chart: All values became NaN after conversion, cannot generate chart")
+                                return None
+                        except Exception as conv_err:
+                            print(f"[DEBUG] _generate_chart: Could not convert y_column to numeric: {conv_err}")
+                            return None
+
             # Set figure size based on component dimensions (limit to reasonable values)
             # Ensure we have valid numeric values
             try:
