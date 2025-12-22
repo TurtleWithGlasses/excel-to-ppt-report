@@ -221,35 +221,26 @@ class ChartComponent(BaseComponent):
                 raw_width = 9.0
                 raw_height = 5.0
 
-            # DEBUG: Print values to help diagnose
-            print(f"[DEBUG] Raw dimensions: {raw_width}x{raw_height} inches")
-
-            # Clamp to reasonable bounds - FORCE to safe values
+            # Clamp to reasonable bounds
             if raw_width > 20.0 or raw_width < 1.0:
-                print(f"[DEBUG] Clamping width from {raw_width} to 20.0")
                 fig_width = 20.0 if raw_width > 20.0 else 9.0
             else:
                 fig_width = raw_width
 
             if raw_height > 15.0 or raw_height < 1.0:
-                print(f"[DEBUG] Clamping height from {raw_height} to 15.0")
                 fig_height = 15.0 if raw_height > 15.0 else 5.0
             else:
                 fig_height = raw_height
 
             # Use lower DPI to prevent huge images
-            dpi = 100  # Reduced from 150
-
-            print(f"[DEBUG] Final dimensions: {fig_width}x{fig_height} inches at {dpi} DPI = {fig_width*dpi}x{fig_height*dpi} pixels")
+            dpi = 100
 
             # Check if resulting image would be too large (max 2^16 = 65536)
             max_pixels = 10000  # Conservative limit
             if fig_width * dpi > max_pixels or fig_height * dpi > max_pixels:
                 # Scale down DPI to fit within limits
-                old_dpi = dpi
                 dpi = int(min(max_pixels / fig_width, max_pixels / fig_height, dpi))
                 dpi = max(50, dpi)  # Minimum 50 DPI for readability
-                print(f"[DEBUG] Scaled DPI from {old_dpi} to {dpi}")
 
             # Set matplotlib's default figsize and dpi to prevent pandas .plot() from creating huge figures
             # This is critical because pandas DataFrame.plot() creates figures internally using rcParams

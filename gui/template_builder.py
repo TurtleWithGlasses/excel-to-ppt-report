@@ -860,10 +860,6 @@ class TemplateBuilder(QMainWindow):
 
     def _show_table_editor(self):
         """Show table editing panel"""
-        print(f"[DEBUG] _show_table_editor: Called")
-        import traceback
-        print(f"[DEBUG] _show_table_editor: Call stack:\n{''.join(traceback.format_stack()[-5:-1])}")
-
         title_label = QLabel("Table Configuration")
         title_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         self.config_layout.addWidget(title_label)
@@ -877,7 +873,6 @@ class TemplateBuilder(QMainWindow):
         existing_sort_order = table_slide_settings.get('ascending', False)
         existing_group_by = table_slide_settings.get('group_by', '')
         existing_columns = table_slide_settings.get('columns', [])
-        print(f"[DEBUG] _show_table_editor: existing_columns from template_data: {existing_columns}")
         
         # Get style settings
         style_settings = table_slide_settings.get('style', {})
@@ -2270,12 +2265,9 @@ class TemplateBuilder(QMainWindow):
 
     def _get_selected_table_columns(self):
         """Get list of selected table columns"""
-        print(f"[DEBUG] _get_selected_table_columns: Called")
         # First, try to get from template_data if widgets might be deleted
         if not hasattr(self, 'table_columns_list'):
             table_columns = self.template_data.get('table_slide', {}).get('columns', [])
-            print(f"[DEBUG] _get_selected_table_columns: No widget, returning from template_data: {table_columns}")
-            # Return exactly what's in template_data, even if empty
             return table_columns
 
         selected = []
@@ -2283,23 +2275,15 @@ class TemplateBuilder(QMainWindow):
             widget = self.table_columns_list
             # Try to access the widget - if it's deleted, this will raise RuntimeError
             count = widget.count()
-            print(f"[DEBUG] _get_selected_table_columns: Widget has {count} items")
             for i in range(count):
                 item = widget.item(i)
                 if item and item.checkState() == Qt.CheckState.Checked:
                     selected.append(item.text())
-                    print(f"[DEBUG] _get_selected_table_columns: Item {i} '{item.text()}' is CHECKED")
-                elif item:
-                    print(f"[DEBUG] _get_selected_table_columns: Item {i} '{item.text()}' is UNCHECKED")
-        except (RuntimeError, SystemError, AttributeError, Exception) as e:
+        except (RuntimeError, SystemError, AttributeError, Exception):
             # Widget was deleted or inaccessible, fall back to template_data
-            print(f"[DEBUG] _get_selected_table_columns: Exception accessing widget: {e}")
             table_columns = self.template_data.get('table_slide', {}).get('columns', [])
-            # Return exactly what's in template_data, even if empty
             return table_columns
 
-        # Return exactly what user selected, even if empty
-        print(f"[DEBUG] _get_selected_table_columns: Returning: {selected}")
         return selected
 
     def _get_selected_chart_colors(self):
@@ -2384,25 +2368,18 @@ class TemplateBuilder(QMainWindow):
             if hasattr(self, 'table_columns_list') and self.table_columns_list:
                 try:
                     selected_cols = self._get_selected_table_columns()
-                    print(f"[DEBUG] _save_table_styling_to_template: Got columns from widget: {selected_cols}")
                     # Only save if user actually selected columns OR if template_data has no columns yet
                     # This prevents clearing columns when widgets are initialized but not yet populated
                     existing_cols = table_slide.get('columns', [])
                     if selected_cols:
                         # User has selected columns, save them
                         table_slide['columns'] = selected_cols
-                        print(f"[DEBUG] _save_table_styling_to_template: Saved columns to table_slide: {table_slide['columns']}")
                     elif not existing_cols:
                         # No existing columns and none selected, save empty list
                         table_slide['columns'] = []
-                        print("[DEBUG] _save_table_styling_to_template: Saved empty columns (no existing)")
-                    else:
-                        # Existing columns but widget shows empty - keep existing (widget might be mid-initialization)
-                        print(f"[DEBUG] _save_table_styling_to_template: Keeping existing columns (widget may be initializing): {existing_cols}")
-                except (RuntimeError, AttributeError, SystemError) as e:
+                    # else: Existing columns but widget shows empty - keep existing (widget might be mid-initialization)
+                except (RuntimeError, AttributeError, SystemError):
                     # Widget was deleted, keep existing columns
-                    print(f"[DEBUG] _save_table_styling_to_template: Widget deleted, keeping existing columns: {e}")
-                    # Only preserve if columns already exist, otherwise set to empty
                     if 'columns' not in table_slide:
                         table_slide['columns'] = []
             else:
@@ -2508,28 +2485,20 @@ class TemplateBuilder(QMainWindow):
 
     def _get_table_slide_data(self):
         """Get table slide data from template_data, with widget fallback"""
-        print(f"[DEBUG] _get_table_slide_data: Called")
         # First try to get from template_data (most reliable)
         table_slide = self.template_data.get('table_slide', {})
-        print(f"[DEBUG] _get_table_slide_data: table_slide from template_data: {table_slide.get('columns', 'NOT SET')}")
 
         # Get columns - prioritize template_data, then try widget
         saved_columns = table_slide.get('columns', [])
-        print(f"[DEBUG] _get_table_slide_data: saved_columns: {saved_columns}")
         if isinstance(saved_columns, list):
             # Use saved columns regardless of whether it's empty or not
             columns = saved_columns
-            print(f"[DEBUG] _get_table_slide_data: Using saved_columns: {columns}")
         else:
             # Try to get from widget as fallback (only if saved_columns is not a list)
-            print(f"[DEBUG] _get_table_slide_data: saved_columns not a list, trying widget fallback")
             try:
                 columns = self._get_selected_table_columns()
-                print(f"[DEBUG] _get_table_slide_data: Using widget_columns: {columns}")
-            except Exception as e:
-                print(f"[DEBUG] _get_table_slide_data: Exception getting widget columns: {e}")
+            except Exception:
                 columns = []
-                print(f"[DEBUG] _get_table_slide_data: Using empty list (exception): {columns}")
 
         # Build the data structure, using template_data values first
         result = {
@@ -2761,11 +2730,8 @@ class TemplateBuilder(QMainWindow):
 
     def save_template(self):
         """Save template to JSON file in PPTGenerator format"""
-        print(f"[DEBUG] save_template: Starting save")
-
         # Prevent re-entrant calls
         if hasattr(self, '_is_saving') and self._is_saving:
-            print(f"[DEBUG] save_template: Already saving, ignoring duplicate call")
             return
 
         self._is_saving = True
@@ -2773,7 +2739,6 @@ class TemplateBuilder(QMainWindow):
             # Save current component settings before saving template
             self._save_table_styling_to_template()
             self._save_chart_settings_to_template()
-            print(f"[DEBUG] save_template: After saving to template_data, columns are: {self.template_data.get('table_slide', {}).get('columns', 'NOT SET')}")
 
             # IMPORTANT: Also update the current slide's slide_settings to match template_data
             # This ensures that when the template is reloaded, the slide won't override with old data
@@ -2787,7 +2752,6 @@ class TemplateBuilder(QMainWindow):
                 # Update slide's settings to match the current template_data
                 if 'Table' in slide_type or self.selected_component_type == 'Table':
                     current_slide['slide_settings']['table'] = self.template_data.get('table_slide', {}).copy()
-                    print(f"[DEBUG] save_template: Updated slide {self.current_slide_index} table settings with columns: {current_slide['slide_settings']['table'].get('columns', 'NOT SET')}")
                 elif 'Chart' in slide_type or self.selected_component_type == 'Chart':
                     current_slide['slide_settings']['chart'] = self.template_data.get('chart_slide', {}).copy()
                 elif slide_type == 'Title Slide' or self.selected_component_type == 'Title Slide':
@@ -2874,10 +2838,8 @@ class TemplateBuilder(QMainWindow):
                 f"Slides: {len(self.template_data['slides'])}\n"
                 f"Format: PPTGenerator JSON"
             )
-            print(f"[DEBUG] save_template: Save completed successfully")
         finally:
             self._is_saving = False
-            print(f"[DEBUG] save_template: Cleared _is_saving flag")
 
     def load_template(self):
         """Load template from JSON file (supports PPTGenerator format)"""
@@ -3023,20 +2985,16 @@ class TemplateBuilder(QMainWindow):
                 
                 # Set selected columns - respect what user saved
                 selected_columns = table_slide.get('columns', [])
-                print(f"[DEBUG] load_template: Loaded columns from JSON: {selected_columns}")
                 # Ensure selected_columns is a list
                 if not isinstance(selected_columns, list):
                     selected_columns = []
-                    print(f"[DEBUG] load_template: Columns was not a list, using empty list: {selected_columns}")
 
                 # Only set checkboxes if the widget exists
                 if hasattr(self, 'table_columns_list') and self.table_columns_list:
                     try:
                         # Temporarily disconnect the signal to avoid triggering saves during load
                         self.table_columns_list.itemChanged.disconnect(self.on_table_slide_changed)
-                        print(f"[DEBUG] load_template: Disconnected itemChanged signal")
                     except:
-                        print(f"[DEBUG] load_template: Could not disconnect signal (not connected yet)")
                         pass  # Signal might not be connected yet
 
                     for i in range(self.table_columns_list.count()):
@@ -3045,10 +3003,8 @@ class TemplateBuilder(QMainWindow):
                             item_text = item.text()
                             if item_text in selected_columns:
                                 item.setCheckState(Qt.CheckState.Checked)
-                                print(f"[DEBUG] load_template: Set '{item_text}' to CHECKED")
                             else:
                                 item.setCheckState(Qt.CheckState.Unchecked)
-                                print(f"[DEBUG] load_template: Set '{item_text}' to UNCHECKED")
                     
                     # Reconnect the signal
                     try:

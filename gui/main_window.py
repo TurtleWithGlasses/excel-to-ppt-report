@@ -590,6 +590,8 @@ class MainWindow(QMainWindow):
             # Load Excel data for preview rendering
             try:
                 self.excel_data = pd.read_excel(self.excel_path)
+                # Normalize column names - strip whitespace
+                self.excel_data.columns = self.excel_data.columns.str.strip()
             except Exception as e:
                 print(f"Warning: Could not load Excel data: {e}")
                 self.excel_data = None
