@@ -14,10 +14,6 @@ import os
 import json
 import pandas as pd
 from datetime import datetime
-import logging
-
-# Configure logging for this module
-logger = logging.getLogger(__name__)
 
 # Import core PPTGenerator
 try:
@@ -25,7 +21,7 @@ try:
     CORE_AVAILABLE = True
 except ImportError:
     CORE_AVAILABLE = False
-    logger.warning("Core engine not available. Using simulation mode.")
+    print("Warning: Core engine not available. Using simulation mode.")
 
 
 class ReportGeneratorThread(QThread):
@@ -168,52 +164,6 @@ class MainWindow(QMainWindow):
         self.template_map = self.load_templates()
 
         self.init_ui()
-
-    def _find_column(self, df, column_name):
-        """
-        Find a column in DataFrame with case-insensitive and whitespace-tolerant matching.
-        
-        Args:
-            df: pandas DataFrame
-            column_name: The column name to find
-            
-        Returns:
-            The actual column name in the DataFrame, or None if not found
-        """
-        if column_name is None:
-            return None
-            
-        # First try exact match
-        if column_name in df.columns:
-            return column_name
-        
-        # Try case-insensitive match
-        column_name_lower = column_name.lower().strip()
-        for col in df.columns:
-            if col.lower().strip() == column_name_lower:
-                return col
-        
-        # Try partial match (column name contains or is contained)
-        for col in df.columns:
-            col_lower = col.lower().strip()
-            if column_name_lower in col_lower or col_lower in column_name_lower:
-                return col
-        
-        return None
-
-    def _normalize_columns(self, df):
-        """
-        Clean up DataFrame column names by stripping whitespace.
-        
-        Args:
-            df: pandas DataFrame
-            
-        Returns:
-            DataFrame with cleaned column names
-        """
-        df = df.copy()
-        df.columns = df.columns.str.strip()
-        return df
 
     def init_ui(self):
         """Initialize user interface"""
@@ -634,14 +584,14 @@ class MainWindow(QMainWindow):
                 with open(self.template_path, 'r', encoding='utf-8') as f:
                     self.template_data = json.load(f)
             except Exception as e:
-                logger.debug(f"Could not load template data: {e}")
+                print(f"Warning: Could not load template data: {e}")
                 self.template_data = {}
 
             # Load Excel data for preview rendering
             try:
                 self.excel_data = pd.read_excel(self.excel_path)
             except Exception as e:
-                logger.debug(f"Could not load Excel data: {e}")
+                print(f"Warning: Could not load Excel data: {e}")
                 self.excel_data = None
 
             # Get actual slide count from generated PowerPoint
@@ -651,7 +601,7 @@ class MainWindow(QMainWindow):
                 slide_count = len(prs.slides)
                 self.generated_slides = [f"Slide {i}" for i in range(1, slide_count + 1)]
             except Exception as e:
-                logger.debug(f"Could not read slide count from PPTX: {e}")
+                print(f"Warning: Could not read slide count from PPTX: {e}")
                 # Fallback to reading template to estimate
                 slide_count = len(self.template_data.get('slides', []))
                 self.generated_slides = [f"Slide {i}" for i in range(1, slide_count + 1)]
@@ -827,12 +777,12 @@ class MainWindow(QMainWindow):
                         template_map[display_name] = relative_path
 
                     except Exception as e:
-                        logger.debug(f"Error loading template {filename}: {e}")
+                        print(f"Error loading template {filename}: {e}")
                         # Use filename as fallback
                         template_map[filename[:-5]] = os.path.join("templates", "configs", filename)
 
         except Exception as e:
-            logger.debug(f"Error scanning templates directory: {e}")
+            print(f"Error scanning templates directory: {e}")
 
         # If no templates found, return empty dict (user will need to create templates)
         return template_map
@@ -894,15 +844,6 @@ class MainWindow(QMainWindow):
             self._render_table_slide_preview(slide_config)
         elif slide_type == 'Chart Slide':
             self._render_chart_slide_preview(slide_config)
-        elif slide_type == 'Blank Slide':
-            # Blank slide can have chart, table, or both - check slide_settings
-            slide_settings = slide_config.get('slide_settings', {})
-            if 'chart' in slide_settings:
-                self._render_chart_slide_preview(slide_config)
-            elif 'table' in slide_settings:
-                self._render_table_slide_preview(slide_config)
-            else:
-                self._render_content_slide_preview(slide_config)
         else:
             # Generic content slide
             self._render_content_slide_preview(slide_config)
@@ -1009,20 +950,8 @@ class MainWindow(QMainWindow):
         colors = chart_style.get('colors', ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'])
 
         # Render chart based on type
-        # Check if chart_data is a dict (stacked/grouped chart) or DataFrame (regular chart)
-        if chart_data is not None:
-            if isinstance(chart_data, dict) and (chart_data.get('is_stacked') or chart_data.get('is_grouped')):
-                # Stacked or grouped chart data - pass the whole dict
-                df_pivot = chart_data.get('df_pivot')
-                if df_pivot is not None and not df_pivot.empty:
-                    self._draw_data_chart(chart_data, chart_type, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
-                else:
-                    self._draw_placeholder_chart(chart_type, chart_x, chart_y, chart_width, chart_height, colors)
-            elif hasattr(chart_data, 'empty') and not chart_data.empty:
-                # Regular DataFrame
-                self._draw_data_chart(chart_data, chart_type, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
-            else:
-                self._draw_placeholder_chart(chart_type, chart_x, chart_y, chart_width, chart_height, colors)
+        if chart_data is not None and not chart_data.empty:
+            self._draw_data_chart(chart_data, chart_type, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
         else:
             # Render placeholder chart
             self._draw_placeholder_chart(chart_type, chart_x, chart_y, chart_width, chart_height, colors)
@@ -1051,76 +980,37 @@ class MainWindow(QMainWindow):
             return None
 
         try:
-            # Normalize column names (strip whitespace)
-            df_source = self._normalize_columns(self.excel_data)
-            
             # Get column mapping
             columns = table_settings.get('columns', [])
             if not columns:
-                # Use all columns if not specified (no limit)
-                return df_source
+                # Use all columns if not specified
+                return self.excel_data.head(10)
 
-            # Define computed column names that need to be calculated
-            computed_column_names = ['Toplam', 'Pozitif', 'Negatif', 'Nötr', 'YÜKSEK', 'ORTA', 'DÜŞÜK',
-                                     'Basın', 'Radyo', 'Televizyon', 'İnternet', 'Ulusal', 'Yerel']
-            
-            # Also handle column name mappings (e.g., "Kurum" might be same as "Firma")
-            column_aliases = {
-                'Kurum': 'Firma',  # Kurum is often the same as Firma
-            }
-
-            # Parse columns - preserve original order, track which are computed
-            # original_column_order stores (display_name, actual_col_name, is_computed)
-            original_column_order = []
-            selected_columns = []  # Regular columns from Excel
-            computed_columns_needed = []  # Computed columns
-            
+            # Map columns - only select columns that exist in Excel
+            selected_columns = []
             for col_config in columns:
-                col_name = col_config.get('source_column') if isinstance(col_config, dict) else col_config
-                if not col_name:
-                    continue
-                    
-                # Check if it's a computed column
-                if col_name in computed_column_names:
-                    computed_columns_needed.append(col_name)
-                    original_column_order.append((col_name, col_name, True))
-                    continue
-                
-                # Check if it has an alias
-                if col_name in column_aliases:
-                    actual_col = self._find_column(df_source, column_aliases[col_name])
-                    if actual_col:
-                        selected_columns.append(actual_col)
-                        original_column_order.append((col_name, actual_col, False))
-                        continue
-                
-                # Try to find the column directly
-                actual_col = self._find_column(df_source, col_name)
-                if actual_col:
-                    selected_columns.append(actual_col)
-                    original_column_order.append((col_name, actual_col, False))
+                if isinstance(col_config, dict):
+                    source_col = col_config.get('source_column')
+                    if source_col and source_col in self.excel_data.columns:
+                        selected_columns.append(source_col)
+                elif isinstance(col_config, str) and col_config in self.excel_data.columns:
+                    selected_columns.append(col_config)
 
-            if not selected_columns and not computed_columns_needed:
-                logger.debug("No valid columns found in table configuration")
-                return df_source  # Return all data (no limit)
+            if not selected_columns:
+                print("No valid columns found in table configuration")
+                return self.excel_data.head(10)
 
             # Check if we need to group data (look for "Firma" or similar grouping column)
-            group_by_config = table_settings.get('group_by')
-            group_by = self._find_column(df_source, group_by_config) if group_by_config else None
+            group_by = table_settings.get('group_by')
 
             # If no explicit group_by, but "Firma" is in columns, group by Firma
-            if not group_by:
-                firma_col = self._find_column(df_source, 'Firma')
-                if firma_col and firma_col in selected_columns:
-                    group_by = firma_col
+            if not group_by and 'Firma' in selected_columns:
+                group_by = 'Firma'
 
-            if group_by and group_by in df_source.columns:
-                # Ensure group_by column is included in selected columns
-                if group_by not in selected_columns:
-                    selected_columns.insert(0, group_by)
-                
+            # Verify group_by is both in Excel data AND in selected columns
+            if group_by and group_by in self.excel_data.columns and group_by in selected_columns:
                 # Group and aggregate data
-                df = df_source[selected_columns].copy()
+                df = self.excel_data[selected_columns].copy()
 
                 # Identify numeric columns for aggregation
                 numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
@@ -1139,184 +1029,120 @@ class MainWindow(QMainWindow):
 
                     df = df.groupby(group_by, as_index=False).agg(agg_dict)
                 else:
-                    # No numeric columns, just get unique groups with count
-                    df = df_source.groupby(group_by).size().reset_index(name='Toplam')
-                
-                # Add computed columns if needed
-                if computed_columns_needed:
-                    df = self._add_computed_columns_to_table(df_source, df, group_by, computed_columns_needed)
-                    
-            elif selected_columns:
-                # No grouping, just select the columns
-                df = df_source[selected_columns].copy()
+                    # No numeric columns, just get unique groups
+                    df = df.drop_duplicates(subset=[group_by])
             else:
-                # No valid columns found - return all data (no limit)
-                df = df_source.copy()
+                # No grouping, just select the columns
+                df = self.excel_data[selected_columns].copy()
 
             # Apply sorting if specified
-            sort_by_config = table_settings.get('sort_by')
-            sort_by = self._find_column(df, sort_by_config) if sort_by_config else None
+            sort_by = table_settings.get('sort_by')
             if sort_by:
-                # Check if sort_by column exists
+                # Check if sort_by column exists, if not try to find a match
                 if sort_by in df.columns:
                     ascending = table_settings.get('ascending', True)
                     df = df.sort_values(by=sort_by, ascending=ascending)
                 else:
                     # Try common mappings for "Toplam" -> count or first numeric column
-                    logger.debug(f"Sort column '{sort_by}' not found. Using first numeric column.")
+                    print(f"Sort column '{sort_by}' not found. Available columns: {df.columns.tolist()}")
                     # Try to sort by the first numeric column
                     numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
                     if numeric_cols:
                         sort_col = numeric_cols[0]
+                        print(f"Sorting by first numeric column: {sort_col}")
                         ascending = table_settings.get('ascending', True)
                         df = df.sort_values(by=sort_col, ascending=ascending)
 
-            # Apply top_n if specified (no default limit - show all rows)
+            # Apply top_n if specified
             top_n = table_settings.get('top_n')
             if top_n and top_n > 0:
                 df = df.head(top_n)
-            # If no top_n specified, show all rows (no limit)
+            else:
+                df = df.head(10)  # Default to 10 rows
 
-            # Reorder columns to match the original template order
-            if original_column_order:
-                final_column_order = []
-                for display_name, actual_col, is_computed in original_column_order:
-                    # For computed columns, use the display name (e.g., 'Toplam')
-                    # For regular columns, use the actual column name from Excel
-                    col_to_use = display_name if is_computed else actual_col
-                    if col_to_use in df.columns:
-                        final_column_order.append(col_to_use)
-                
-                # Add any remaining columns that weren't in the original order
-                for col in df.columns:
-                    if col not in final_column_order:
-                        final_column_order.append(col)
-                
-                # Reorder the DataFrame
-                df = df[final_column_order]
-
-            logger.debug(f"Table data extracted: {len(df)} rows (grouped: {group_by is not None})")
+            print(f"Table data extracted: {len(df)} rows (grouped: {group_by is not None})")
             return df
 
         except Exception as e:
-            logger.warning(f"Error getting table data: {e}")
+            print(f"Error getting table data: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def _get_chart_data(self, chart_settings):
         """Get chart data from Excel based on chart settings"""
         if not hasattr(self, 'excel_data') or self.excel_data is None:
-            logger.debug("No Excel data available")
+            print("No Excel data available")
             return None
 
         try:
-            x_column_config = chart_settings.get('x_column')
-            y_column_config = chart_settings.get('y_column')
-            chart_type = chart_settings.get('chart_type', 'column')
+            x_column = chart_settings.get('x_column')
+            y_column = chart_settings.get('y_column')
 
-            if not x_column_config or not y_column_config:
-                logger.debug(f"Missing column config: x_column={x_column_config}, y_column={y_column_config}")
+            if not x_column or not y_column:
+                print(f"Missing column config: x_column={x_column}, y_column={y_column}")
                 return None
 
-            # Normalize column names and handle duplicates
-            df_source = self._normalize_columns(self.excel_data)
+            # Handle duplicate columns in DataFrame
+            df_source = self.excel_data
             if df_source.columns.duplicated().any():
-                logger.debug("DataFrame has duplicate column names. Removing duplicates.")
+                print("Warning: DataFrame has duplicate column names. Removing duplicates.")
                 df_source = df_source.loc[:, ~df_source.columns.duplicated()]
 
-            # Find actual column names using case-insensitive matching
-            x_column = self._find_column(df_source, x_column_config)
-            if not x_column:
-                logger.debug(f"X column '{x_column_config}' not found in Excel. Available: {df_source.columns.tolist()[:5]}...")
+            if x_column not in df_source.columns:
+                print(f"X column '{x_column}' not found in Excel. Available columns: {df_source.columns.tolist()}")
                 return None
 
             # Define computed column names that need to be calculated
             computed_column_names = ['Toplam', 'Pozitif', 'Negatif', 'Nötr', 'YÜKSEK', 'ORTA', 'DÜŞÜK',
                                      'Basın', 'Radyo', 'Televizyon', 'İnternet', 'Ulusal', 'Yerel']
-            
-            # Define categorical columns that should be used as series for stacked charts
-            categorical_columns = ['Medya Tür', 'Mecra Tipi', 'Yayın Tipi', 'Yayın Türü', 'Mecra',
-                                   'Duygu', 'Ton', 'Algı', 'Kategori', 'Şehir', 'Medya Kapsam',
-                                   'Bahis Ağırlığı', 'Görünürlük', 'Boyut',
-                                   'Medya Peryod', 'Medya İçerik', 'Kupür Tipi',
-                                   'Görsel Malzeme', 'Medya Grup Adı']
 
             # Check if y_column is a computed column
-            is_computed_column = y_column_config in computed_column_names
-            
-            # Handle stacked and grouped charts specially
-            if chart_type in ('stacked_bar', 'stacked_column', 'grouped_bar', 'grouped_column'):
-                # Find if y_column is a categorical column (for series)
-                y_column = self._find_column(df_source, y_column_config)
-                is_categorical = y_column_config in categorical_columns or (
-                    y_column and not pd.api.types.is_numeric_dtype(df_source[y_column])
-                )
-                
-                if is_categorical and y_column:
-                    # Use y_column as series column and create pivoted data
-                    is_grouped = chart_type in ('grouped_bar', 'grouped_column')
-                    return self._get_stacked_chart_data(df_source, x_column, y_column, chart_settings, is_grouped=is_grouped)
-            
-            # Special case: if x_column and y_column are the same, use count (like Toplam)
-            if x_column_config == y_column_config:
-                logger.debug(f"X and Y columns are the same ('{x_column_config}'), using row count")
-                df = df_source.groupby(x_column).size().reset_index(name='Toplam')
-                y_column = 'Toplam'
-                # Skip the normal processing
-                calculation = chart_settings.get('calculation', 'sum')
+            is_computed_column = y_column in computed_column_names
+
+            if not is_computed_column and y_column not in df_source.columns:
+                print(f"Y column '{y_column}' not found in Excel. Available columns: {df_source.columns.tolist()}")
+                return None
+
+            # Handle computed columns differently
+            if is_computed_column:
+                # Calculate the computed column based on grouping by x_column
+                df = self._calculate_computed_column_for_chart(df_source, x_column, y_column)
+                if df is None or df.empty:
+                    print(f"Could not calculate computed column '{y_column}'")
+                    return None
             else:
-                # Find actual y_column or use computed column name
-                if is_computed_column:
-                    y_column = y_column_config
-                else:
-                    y_column = self._find_column(df_source, y_column_config)
-                    if not y_column:
-                        logger.debug(f"Y column '{y_column_config}' not found in Excel.")
-                        return None
-
-                # Handle computed columns differently
-                if is_computed_column:
-                    # Calculate the computed column based on grouping by x_column
-                    df = self._calculate_computed_column_for_chart(df_source, x_column, y_column)
-                    if df is None or df.empty:
-                        logger.debug(f"Could not calculate computed column '{y_column}'")
-                        return None
-                else:
-                    # Regular column from Excel
-                    # Check if y_column is numeric
-                    if not pd.api.types.is_numeric_dtype(df_source[y_column]):
-                        logger.debug(f"Y column '{y_column}' is not numeric, attempting conversion")
-                        # Try to convert to numeric
-                        try:
-                            df_temp = df_source[[x_column, y_column]].copy()
-                            df_temp[y_column] = pd.to_numeric(df_temp[y_column], errors='coerce')
-                            df_temp = df_temp.dropna(subset=[y_column])
-                            if df_temp.empty:
-                                # If conversion fails, use row count as fallback
-                                logger.debug(f"Could not convert '{y_column}' to numeric, using row count")
-                                df = df_source.groupby(x_column).size().reset_index(name='Toplam')
-                                y_column = 'Toplam'
-                            else:
-                                df = df_temp
-                        except Exception as conv_err:
-                            # Fallback to row count
-                            logger.debug(f"Could not convert '{y_column}' to numeric: {conv_err}, using row count")
-                            df = df_source.groupby(x_column).size().reset_index(name='Toplam')
-                            y_column = 'Toplam'
-                    else:
-                        df = df_source[[x_column, y_column]].copy()
-
-                    # Apply calculation if specified (only for non-computed regular columns)
-                    calculation = chart_settings.get('calculation', 'sum')
+                # Regular column from Excel
+                # Check if y_column is numeric
+                if not pd.api.types.is_numeric_dtype(df_source[y_column]):
+                    print(f"Warning: Y column '{y_column}' is not numeric (dtype: {df_source[y_column].dtype})")
+                    # Try to convert to numeric
                     try:
-                        if calculation == 'sum':
-                            df = df.groupby(x_column, as_index=False)[y_column].sum()
-                        elif calculation == 'mean':
-                            df = df.groupby(x_column, as_index=False)[y_column].mean()
-                        elif calculation == 'count':
-                            df = df.groupby(x_column, as_index=False)[y_column].count()
-                    except Exception as groupby_err:
-                        logger.debug(f"Error during groupby aggregation: {groupby_err}")
+                        df_temp = df_source[[x_column, y_column]].copy()
+                        df_temp[y_column] = pd.to_numeric(df_temp[y_column], errors='coerce')
+                        df_temp = df_temp.dropna(subset=[y_column])
+                        if df_temp.empty:
+                            print(f"Could not convert '{y_column}' to numeric - all values became NaN")
+                            return None
+                        df = df_temp
+                    except Exception as conv_err:
+                        print(f"Could not convert '{y_column}' to numeric: {conv_err}")
                         return None
+                else:
+                    df = df_source[[x_column, y_column]].copy()
+
+                # Apply calculation if specified
+                calculation = chart_settings.get('calculation', 'sum')
+                try:
+                    if calculation == 'sum':
+                        df = df.groupby(x_column, as_index=False)[y_column].sum()
+                    elif calculation == 'mean':
+                        df = df.groupby(x_column, as_index=False)[y_column].mean()
+                    elif calculation == 'count':
+                        df = df.groupby(x_column, as_index=False)[y_column].count()
+                except Exception as groupby_err:
+                    print(f"Error during groupby aggregation: {groupby_err}")
+                    return None
 
             # Apply sorting
             sort_by = chart_settings.get('sort_by')
@@ -1332,17 +1158,20 @@ class MainWindow(QMainWindow):
                     # Default to sorting by Y values
                     df = df.sort_values(by=y_column, ascending=ascending)
 
-            # Apply top_n only if specified (no default limit - show all)
+            # Apply top_n
             top_n = chart_settings.get('top_n')
             if top_n and top_n > 0:
                 df = df.head(top_n)
-            # If no top_n specified, show all data (no limit)
+            else:
+                df = df.head(10)
 
-            logger.debug(f"Chart data extracted: {len(df)} rows")
+            print(f"Chart data extracted successfully: {len(df)} rows")
             return df
 
         except Exception as e:
-            logger.warning(f"Error getting chart data: {e}")
+            print(f"Error getting chart data: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def _calculate_computed_column_for_chart(self, df_source, x_column, computed_column_name):
@@ -1382,7 +1211,7 @@ class MainWindow(QMainWindow):
             }
 
             if computed_column_name not in computed_mappings:
-                logger.debug(f"Unknown computed column: {computed_column_name}")
+                print(f"Unknown computed column: {computed_column_name}")
                 return None
 
             source_col_spec, values = computed_mappings[computed_column_name]
@@ -1391,18 +1220,18 @@ class MainWindow(QMainWindow):
                 # Total count per group
                 df = grouped.size().reset_index(name=computed_column_name)
             else:
-                # Find the source column (handle list of possible column names with case-insensitive matching)
-                source_col = None
+                # Find the source column (handle list of possible column names)
                 if isinstance(source_col_spec, list):
+                    source_col = None
                     for possible_col in source_col_spec:
-                        source_col = self._find_column(df_source, possible_col)
-                        if source_col:
+                        if possible_col in df_source.columns:
+                            source_col = possible_col
                             break
                 else:
-                    source_col = self._find_column(df_source, source_col_spec)
+                    source_col = source_col_spec if source_col_spec in df_source.columns else None
 
                 if source_col is None:
-                    logger.debug(f"Source column for '{computed_column_name}' not found in data")
+                    print(f"Source column for '{computed_column_name}' not found in data")
                     return None
 
                 # Count specific values in the source column
@@ -1419,136 +1248,10 @@ class MainWindow(QMainWindow):
             return df
 
         except Exception as e:
-            logger.warning(f"Error calculating computed column '{computed_column_name}': {e}")
+            print(f"Error calculating computed column '{computed_column_name}': {e}")
+            import traceback
+            traceback.print_exc()
             return None
-
-    def _get_stacked_chart_data(self, df_source, x_column, series_column, chart_settings, is_grouped=False):
-        """
-        Get data for stacked or grouped charts (stacked_bar, stacked_column, grouped_bar, grouped_column).
-        Returns a dict with pivoted DataFrame and metadata.
-        
-        Args:
-            df_source: Source DataFrame
-            x_column: Column for X-axis categories
-            series_column: Column for series (stacking/grouping)
-            chart_settings: Chart configuration
-            is_grouped: If True, returns data for grouped chart instead of stacked
-        
-        Returns:
-            dict with 'df_pivot' (pivoted DataFrame), 'x_column', 'series_column', 'is_stacked'/'is_grouped'
-        """
-        try:
-            # Use crosstab to count occurrences - rows = x_column, columns = series_column
-            df_pivot = pd.crosstab(
-                index=df_source[x_column],
-                columns=df_source[series_column]
-            ).fillna(0)
-            
-            # Apply sorting
-            sort_by = chart_settings.get('sort_by')
-            ascending = chart_settings.get('ascending', True)
-            
-            # Calculate total for sorting
-            df_pivot['__total__'] = df_pivot.sum(axis=1)
-            
-            if sort_by == 'y' or not sort_by:
-                # Sort by total (descending by default for charts)
-                df_pivot = df_pivot.sort_values(by='__total__', ascending=ascending)
-            else:
-                # Sort by x (category name)
-                df_pivot = df_pivot.sort_index(ascending=ascending)
-            
-            # Remove the total column used for sorting
-            df_pivot = df_pivot.drop(columns=['__total__'])
-            
-            # Apply top_n only if specified (no default limit - show all)
-            top_n = chart_settings.get('top_n')
-            if top_n and top_n > 0:
-                df_pivot = df_pivot.head(top_n)
-            # If no top_n specified, show all data (no limit)
-            
-            chart_type_name = "Grouped" if is_grouped else "Stacked"
-            logger.debug(f"{chart_type_name} chart data: {len(df_pivot)} rows, {len(df_pivot.columns)} series")
-            
-            return {
-                'df_pivot': df_pivot,
-                'x_column': x_column,
-                'series_column': series_column,
-                'is_stacked': not is_grouped,
-                'is_grouped': is_grouped
-            }
-            
-        except Exception as e:
-            logger.warning(f"Error creating stacked/grouped chart data: {e}")
-            return None
-
-    def _add_computed_columns_to_table(self, df_source, df_grouped, group_by, computed_columns):
-        """
-        Add computed columns to a grouped table DataFrame.
-        
-        Args:
-            df_source: Original source DataFrame
-            df_grouped: Already grouped DataFrame
-            group_by: Column used for grouping
-            computed_columns: List of computed column names to add
-            
-        Returns:
-            DataFrame with computed columns added
-        """
-        try:
-            # Define computed column mappings (same as chart)
-            computed_mappings = {
-                'Toplam': ('__count__', None),
-                'Pozitif': ('Algı', ['Pozitif', 'POZİTİF', 'POZITIF', 'pozitif']),
-                'Negatif': ('Algı', ['Negatif', 'NEGATİF', 'NEGATIF', 'negatif']),
-                'Nötr': ('Algı', ['Nötr', 'NÖTR', 'Notr', 'NOTR', 'nötr']),
-                'YÜKSEK': ('Algı', ['YÜKSEK', 'Yüksek', 'yüksek']),
-                'ORTA': ('Algı', ['ORTA', 'Orta', 'orta']),
-                'DÜŞÜK': ('Algı', ['DÜŞÜK', 'Düşük', 'düşük']),
-                'Basın': (['Mecra', 'Medya Tür'], ['Basın', 'BASIN', 'basın', 'Gazete', 'GAZETE']),
-                'Radyo': (['Mecra', 'Medya Tür'], ['Radyo', 'RADYO', 'radyo']),
-                'Televizyon': (['Mecra', 'Medya Tür'], ['Televizyon', 'TV', 'TELEVİZYON', 'televizyon']),
-                'İnternet': (['Mecra', 'Medya Tür'], ['İnternet', 'İNTERNET', 'Internet', 'INTERNET', 'Online', 'ONLINE']),
-                'Ulusal': ('Medya Kapsam', ['Ulusal', 'ULUSAL', 'ulusal']),
-                'Yerel': ('Medya Kapsam', ['Yerel', 'YEREL', 'yerel']),
-            }
-            
-            result_df = df_grouped.copy()
-            
-            for col_name in computed_columns:
-                if col_name not in computed_mappings:
-                    continue
-                    
-                source_col_spec, values = computed_mappings[col_name]
-                
-                if source_col_spec == '__count__':
-                    # Total count per group
-                    counts = df_source.groupby(group_by).size()
-                    result_df[col_name] = result_df[group_by].map(counts).fillna(0).astype(int)
-                else:
-                    # Find the source column
-                    source_col = None
-                    if isinstance(source_col_spec, list):
-                        for possible_col in source_col_spec:
-                            source_col = self._find_column(df_source, possible_col)
-                            if source_col:
-                                break
-                    else:
-                        source_col = self._find_column(df_source, source_col_spec)
-                    
-                    if source_col:
-                        # Count specific values in the source column per group
-                        filtered = df_source[df_source[source_col].isin(values)]
-                        counts = filtered.groupby(group_by).size()
-                        result_df[col_name] = result_df[group_by].map(counts).fillna(0).astype(int)
-                    else:
-                        result_df[col_name] = 0
-            
-            return result_df
-            
-        except Exception as e:
-            logger.warning(f"Error adding computed columns to table: {e}")
-            return df_grouped
 
     def _draw_data_table(self, df, table_settings):
         """Draw table with actual data"""
@@ -1565,27 +1268,12 @@ class MainWindow(QMainWindow):
 
         # Get style settings
         table_style = table_settings.get('style', {})
-        
-        # Debug: Log the style values being used
-        logger.debug(f"Table style settings: header_text_color={table_style.get('header_text_color')}, text_color={table_style.get('text_color')}")
-        
-        # Colors
         header_color = QColor(table_style.get('header_color', '#1F2937'))
         header_text_color = QColor(table_style.get('header_text_color', '#FFFFFF'))
         row_color_1 = QColor(table_style.get('row_color_1', '#FFFFFF'))
         row_color_2 = QColor(table_style.get('row_color_2', '#F9FAFB'))
         text_color = QColor(table_style.get('text_color', '#1F2937'))
         border_color = QColor(table_style.get('border_color', '#E5E7EB'))
-        
-        # Font and text styling
-        font_name = table_style.get('font_name', 'Calibri')
-        font_size = table_style.get('font_size', 11)
-        header_bold = table_style.get('header_bold', True)
-        header_italic = table_style.get('header_italic', False)
-        text_bold = table_style.get('text_bold', False)
-        text_italic = table_style.get('text_italic', False)
-        header_alignment = table_style.get('header_alignment', 'Center')
-        text_alignment = table_style.get('text_alignment', 'Left')
 
         # Draw header
         for col_idx, col_name in enumerate(df.columns):
@@ -1597,29 +1285,16 @@ class MainWindow(QMainWindow):
                 border_color, header_color
             )
 
-            # Header text with proper styling
-            header_font = QFont(font_name, font_size)
-            if header_bold:
-                header_font.setBold(True)
-            if header_italic:
-                header_font.setItalic(True)
+            # Header text
+            header_font = QFont("Calibri", 11)
+            header_font.setBold(True)
             header_text = self.slide_scene.addText(str(col_name), header_font)
             header_text.setDefaultTextColor(header_text_color)
             header_rect = header_text.boundingRect()
-            
-            # Apply header alignment
-            text_width = header_rect.width()
-            if header_alignment == 'Left':
-                x_offset = 5
-            elif header_alignment == 'Right':
-                x_offset = col_width - text_width - 5
-            else:  # Center
-                x_offset = (col_width - text_width) / 2
-            
-            header_text.setPos(x + x_offset, table_y + (row_height - header_rect.height()) / 2)
+            header_text.setPos(x + 5, table_y + (row_height - header_rect.height()) / 2)
 
-        # Draw all data rows (no limit)
-        max_rows = len(df)
+        # Draw data rows (limit to 8 rows for preview)
+        max_rows = min(len(df), 8)
         for row_idx in range(max_rows):
             y = table_y + (row_idx + 1) * row_height
             row_color = row_color_1 if row_idx % 2 == 0 else row_color_2
@@ -1633,57 +1308,21 @@ class MainWindow(QMainWindow):
                     border_color, row_color
                 )
 
-                # Cell text with proper styling
+                # Cell text
                 value = df.iloc[row_idx][col_name]
-                
-                # Format the value properly for display
-                display_value = self._format_table_value(value)
-                
-                cell_font = QFont(font_name, font_size - 1)  # Slightly smaller for data
-                if text_bold:
-                    cell_font.setBold(True)
-                if text_italic:
-                    cell_font.setItalic(True)
-                cell_text = self.slide_scene.addText(display_value, cell_font)
+                cell_font = QFont("Calibri", 10)
+                cell_text = self.slide_scene.addText(str(value), cell_font)
                 cell_text.setDefaultTextColor(text_color)
                 cell_rect = cell_text.boundingRect()
 
-                # Apply text alignment
-                text_width = cell_rect.width()
-                if text_alignment == 'Left':
-                    x_offset = 5
-                elif text_alignment == 'Right':
-                    x_offset = col_width - text_width - 5
-                else:  # Center
-                    x_offset = (col_width - text_width) / 2
-                
-                cell_text.setPos(x + x_offset, y + (row_height - cell_rect.height()) / 2)
+                # Truncate if too long
+                if cell_rect.width() > col_width - 10:
+                    text_str = str(value)
+                    if len(text_str) > 15:
+                        text_str = text_str[:12] + "..."
+                        cell_text.setPlainText(text_str)
 
-    def _format_table_value(self, value):
-        """Format a value for display in the table with full decimal precision"""
-        import pandas as pd
-        import numpy as np
-        
-        # Handle None/NaN
-        if pd.isna(value):
-            return ""
-        
-        # Handle numeric values - show full decimal precision
-        if isinstance(value, (int, np.integer)):
-            # Integer - format with thousand separators
-            return f"{value:,}"
-        elif isinstance(value, (float, np.floating)):
-            # Float - show full precision, remove trailing zeros
-            if value == int(value):
-                # Whole number stored as float
-                return f"{int(value):,}"
-            else:
-                # Decimal number - format with up to 6 decimal places, strip trailing zeros
-                formatted = f"{value:,.6f}".rstrip('0').rstrip('.')
-                return formatted
-        else:
-            # String or other - return as is
-            return str(value)
+                cell_text.setPos(x + 5, y + (row_height - cell_rect.height()) / 2)
 
     def _draw_placeholder_table(self, table_settings):
         """Draw placeholder table when no data available"""
@@ -1724,16 +1363,12 @@ class MainWindow(QMainWindow):
             self._draw_stacked_column_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
         elif chart_type == 'stacked_bar':
             self._draw_stacked_bar_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
-        elif chart_type == 'grouped_column':
-            self._draw_grouped_column_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
-        elif chart_type == 'grouped_bar':
-            self._draw_grouped_bar_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
         else:
             self._draw_placeholder_chart(chart_type, chart_x, chart_y, chart_width, chart_height, colors)
 
     def _draw_column_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw column chart with real data - no limit on number of bars"""
-        num_bars = len(df)  # Show ALL data points
+        """Draw column chart with real data"""
+        num_bars = min(len(df), 10)
         if num_bars == 0:
             return
 
@@ -1744,10 +1379,6 @@ class MainWindow(QMainWindow):
         max_val = df[y_col].max()
         if max_val == 0:
             max_val = 1
-
-        # Adjust font size based on number of bars
-        value_font_size = max(6, 10 - num_bars // 5)
-        category_font_size = max(5, 8 - num_bars // 5)
 
         for i in range(num_bars):
             bar_x = chart_x + (i + 0.5) * bar_width
@@ -1765,7 +1396,7 @@ class MainWindow(QMainWindow):
             )
 
             # Value label
-            value_font = QFont("Calibri", value_font_size)
+            value_font = QFont("Calibri", 8)
             value_text = self.slide_scene.addText(f"{value:,.0f}" if value >= 1 else f"{value:.2f}", value_font)
             value_text.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_text.boundingRect()
@@ -1774,19 +1405,17 @@ class MainWindow(QMainWindow):
             # Category label
             x_col = df.columns[0]
             category = str(df.iloc[i][x_col])
-            # Truncate based on available space
-            max_chars = max(4, int(bar_width / 6))
-            if len(category) > max_chars:
-                category = category[:max_chars-2] + ".."
-            category_font = QFont("Calibri", category_font_size)
+            if len(category) > 10:
+                category = category[:8] + ".."
+            category_font = QFont("Calibri", 7)
             category_text = self.slide_scene.addText(category, category_font)
             category_text.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_text.boundingRect()
             category_text.setPos(bar_x - category_rect.width() / 2, chart_y + chart_height + 5)
 
     def _draw_bar_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw horizontal bar chart with real data - no limit on number of bars"""
-        num_bars = len(df)  # Show ALL data points
+        """Draw horizontal bar chart with real data"""
+        num_bars = min(len(df), 8)
         if num_bars == 0:
             return
 
@@ -1798,156 +1427,83 @@ class MainWindow(QMainWindow):
         if max_val == 0:
             max_val = 1
 
-        # Adjust font size based on number of bars
-        value_font_size = max(6, 10 - num_bars // 5)
-        category_font_size = max(6, 9 - num_bars // 5)
-
         for i in range(num_bars):
             bar_y = chart_y + (i + 0.5) * bar_height
             value = df.iloc[i][y_col]
-            actual_bar_width = (value / max_val) * chart_width * 0.7
+            bar_width = (value / max_val) * chart_width * 0.7
 
             color_index = i % len(colors)
             bar_color = QColor(colors[color_index])
 
             self.slide_scene.addRect(
                 chart_x + 100, bar_y - bar_height * 0.3,
-                actual_bar_width, bar_height * 0.6,
+                bar_width, bar_height * 0.6,
                 bar_color, bar_color
             )
 
             # Value label
-            value_font = QFont("Calibri", value_font_size)
+            value_font = QFont("Calibri", 8)
             value_text = self.slide_scene.addText(f"{value:,.0f}" if value >= 1 else f"{value:.2f}", value_font)
             value_text.setDefaultTextColor(QColor("#1F2937"))
             value_rect = value_text.boundingRect()
-            value_text.setPos(chart_x + 100 + actual_bar_width + 5, bar_y - value_rect.height() / 2)
+            value_text.setPos(chart_x + 100 + bar_width + 5, bar_y - value_rect.height() / 2)
 
             # Category label
             x_col = df.columns[0]
             category = str(df.iloc[i][x_col])
             if len(category) > 12:
                 category = category[:10] + ".."
-            category_font = QFont("Calibri", category_font_size)
+            category_font = QFont("Calibri", 8)
             category_text = self.slide_scene.addText(category, category_font)
             category_text.setDefaultTextColor(QColor("#6B7280"))
             category_rect = category_text.boundingRect()
             category_text.setPos(chart_x + 10, bar_y - category_rect.height() / 2)
 
     def _draw_pie_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw pie chart with real data and labels outside the pie"""
-        import math
-        num_slices = len(df)  # Show ALL slices
+        """Draw pie chart with real data"""
+        num_slices = min(len(df), 8)
         if num_slices == 0:
             return
 
-        # Position pie to the left to make room for legend
-        pie_center_x = chart_x + chart_width * 0.35
+        center_x = chart_x + chart_width / 2
         center_y = chart_y + chart_height / 2
-        radius = min(chart_width * 0.5, chart_height) * 0.35
-        label_radius = radius * 1.35  # Radius for label positioning
+        radius = min(chart_width, chart_height) * 0.35
 
         # Get values
-        x_col = df.columns[0]
         y_col = df.columns[1]
         total = df[y_col].sum()
         if total == 0:
             return
 
-        from PyQt6.QtCore import QRectF
-
-        # Adjust font size based on number of slices
-        label_font_size = max(6, 9 - num_slices // 4)
-        legend_font_size = max(6, 8 - num_slices // 4)
-
         # Draw slices
-        start_angle = 90  # Start from top (12 o'clock position)
+        start_angle = 0
         for i in range(num_slices):
             value = df.iloc[i][y_col]
-            category = str(df.iloc[i][x_col])
-            percentage = (value / total) * 100
             angle = (value / total) * 360
 
             color_index = i % len(colors)
             slice_color = QColor(colors[color_index])
 
-            rect = QRectF(pie_center_x - radius, center_y - radius, radius * 2, radius * 2)
+            from PyQt6.QtCore import QRectF
+            rect = QRectF(center_x - radius, center_y - radius, radius * 2, radius * 2)
             path = QPainterPath()
-            path.moveTo(pie_center_x, center_y)
-            path.arcTo(rect, start_angle, -angle)  # Negative angle for clockwise
+            path.moveTo(center_x, center_y)
+            path.arcTo(rect, start_angle, angle)
             path.closeSubpath()
 
             self.slide_scene.addPath(path, slice_color, slice_color)
 
-            # Calculate label position at middle of slice - only for significant slices
-            if percentage >= 5:
-                mid_angle = start_angle - angle / 2
-                mid_angle_rad = math.radians(mid_angle)
-                label_x = pie_center_x + label_radius * math.cos(mid_angle_rad)
-                label_y = center_y - label_radius * math.sin(mid_angle_rad)
-
-                # Truncate category name
-                if len(category) > 10:
-                    category = category[:8] + ".."
-
-                # Create label text
-                label_text = f"{category}\n{value:,.0f} ({percentage:.1f}%)"
-
-                label_font = QFont("Calibri", label_font_size)
-                label_item = self.slide_scene.addText(label_text, label_font)
-                label_item.setDefaultTextColor(QColor("#1F2937"))
-                label_rect = label_item.boundingRect()
-
-                # Adjust position based on which side of the pie
-                if mid_angle_rad >= -math.pi/2 and mid_angle_rad <= math.pi/2:
-                    # Right side
-                    label_item.setPos(label_x, label_y - label_rect.height() / 2)
-                else:
-                    # Left side
-                    label_item.setPos(label_x - label_rect.width(), label_y - label_rect.height() / 2)
-
-            start_angle -= angle  # Move to next slice (clockwise)
-
-        # Add legend on the right side showing ALL items
-        legend_x = chart_x + chart_width * 0.65
-        legend_y = chart_y + 20
-        legend_item_height = max(14, chart_height / (num_slices + 2))
-
-        for i in range(num_slices):
-            value = df.iloc[i][y_col]
-            category = str(df.iloc[i][x_col])
-            percentage = (value / total) * 100
-
-            color_index = i % len(colors)
-            legend_color = QColor(colors[color_index])
-
-            # Color box
-            box_y = legend_y + i * legend_item_height
-            self.slide_scene.addRect(
-                legend_x, box_y,
-                10, 10,
-                legend_color, legend_color
-            )
-
-            # Legend text
-            if len(category) > 12:
-                category = category[:10] + ".."
-            legend_text = f"{category}: {value:,.0f} ({percentage:.1f}%)"
-            legend_font = QFont("Calibri", legend_font_size)
-            legend_item = self.slide_scene.addText(legend_text, legend_font)
-            legend_item.setDefaultTextColor(QColor("#4B5563"))
-            legend_item.setPos(legend_x + 14, box_y - 2)
+            start_angle += angle
 
     def _draw_line_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw line chart with real data and labels"""
-        num_points = len(df)  # Show ALL data points
+        """Draw line chart with real data"""
+        num_points = min(len(df), 10)
         if num_points == 0:
             return
 
         point_spacing = chart_width / (num_points + 1)
 
-        # Get values
-        x_col = df.columns[0]
+        # Get max value for scaling
         y_col = df.columns[1]
         max_val = df[y_col].max()
         min_val = df[y_col].min()
@@ -1956,10 +1512,6 @@ class MainWindow(QMainWindow):
 
         pen = QPen(QColor(colors[0]))
         pen.setWidth(3)
-
-        # Adjust font size based on number of points
-        value_font_size = max(6, 9 - num_points // 5)
-        category_font_size = max(5, 8 - num_points // 5)
 
         # Draw lines and points
         for i in range(num_points - 1):
@@ -1977,349 +1529,19 @@ class MainWindow(QMainWindow):
             # Draw point
             self.slide_scene.addEllipse(x1 - 4, y1 - 4, 8, 8, pen, QColor(colors[0]))
 
-            # Value label above point
-            value_font = QFont("Calibri", value_font_size)
-            value_text = self.slide_scene.addText(f"{value1:,.0f}" if value1 >= 1 else f"{value1:.2f}", value_font)
-            value_text.setDefaultTextColor(QColor("#1F2937"))
-            value_rect = value_text.boundingRect()
-            value_text.setPos(x1 - value_rect.width() / 2, y1 - value_rect.height() - 8)
-
-            # Category label below
-            category = str(df.iloc[i][x_col])
-            max_chars = max(4, int(point_spacing / 6))
-            if len(category) > max_chars:
-                category = category[:max_chars-2] + ".."
-            category_font = QFont("Calibri", category_font_size)
-            category_text = self.slide_scene.addText(category, category_font)
-            category_text.setDefaultTextColor(QColor("#6B7280"))
-            category_rect = category_text.boundingRect()
-            category_text.setPos(x1 - category_rect.width() / 2, chart_y + chart_height + 5)
-
-        # Draw last point with labels
+        # Draw last point
         x_last = chart_x + num_points * point_spacing
         value_last = df.iloc[num_points - 1][y_col]
         y_last = chart_y + chart_height - ((value_last - min_val) / (max_val - min_val)) * chart_height * 0.8
         self.slide_scene.addEllipse(x_last - 4, y_last - 4, 8, 8, pen, QColor(colors[0]))
 
-        # Last value label
-        value_font = QFont("Calibri", value_font_size)
-        value_text = self.slide_scene.addText(f"{value_last:,.0f}" if value_last >= 1 else f"{value_last:.2f}", value_font)
-        value_text.setDefaultTextColor(QColor("#1F2937"))
-        value_rect = value_text.boundingRect()
-        value_text.setPos(x_last - value_rect.width() / 2, y_last - value_rect.height() - 8)
+    def _draw_stacked_column_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
+        """Draw stacked column chart (simplified - uses same as column for now)"""
+        self._draw_column_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
 
-        # Last category label
-        category = str(df.iloc[num_points - 1][x_col])
-        max_chars = max(4, int(point_spacing / 6))
-        if len(category) > max_chars:
-            category = category[:max_chars-2] + ".."
-        category_font = QFont("Calibri", category_font_size)
-        category_text = self.slide_scene.addText(category, category_font)
-        category_text.setDefaultTextColor(QColor("#6B7280"))
-        category_rect = category_text.boundingRect()
-        category_text.setPos(x_last - category_rect.width() / 2, chart_y + chart_height + 5)
-
-    def _draw_stacked_column_chart_with_data(self, data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw stacked column chart with real data"""
-        # Check if data is stacked format (dict with df_pivot) or regular DataFrame
-        if isinstance(data, dict) and data.get('is_stacked'):
-            df_pivot = data.get('df_pivot')
-            if df_pivot is None or df_pivot.empty:
-                return
-            
-            num_bars = len(df_pivot)
-            if num_bars == 0:
-                return
-            
-            bar_width = chart_width / (num_bars + 1)
-            
-            # Get max stacked value for scaling
-            max_val = df_pivot.sum(axis=1).max()
-            if max_val == 0:
-                max_val = 1
-            
-            # Adjust font size based on number of bars
-            category_font_size = max(5, 8 - num_bars // 5)
-            
-            for i, (category, row) in enumerate(df_pivot.iterrows()):
-                bar_x = chart_x + (i + 0.5) * bar_width
-                cumulative_height = 0
-                
-                for j, (series_name, value) in enumerate(row.items()):
-                    if value <= 0:
-                        continue
-                    
-                    segment_height = (value / max_val) * chart_height * 0.8
-                    bar_y = chart_y + chart_height - cumulative_height - segment_height
-                    
-                    color = QColor(colors[j % len(colors)])
-                    self.slide_scene.addRect(
-                        bar_x, bar_y,
-                        bar_width * 0.8, segment_height,
-                        color, color
-                    )
-                    
-                    cumulative_height += segment_height
-                
-                # Category label
-                category_text = self.slide_scene.addText(str(category)[:10], QFont("Calibri", category_font_size))
-                category_text.setDefaultTextColor(QColor("#374151"))
-                category_rect = category_text.boundingRect()
-                category_text.setPos(bar_x + bar_width * 0.4 - category_rect.width() / 2, chart_y + chart_height + 5)
-            
-            # Draw legend - position based on sort order
-            ascending = chart_settings.get('ascending', True)
-            self._draw_stacked_legend(df_pivot.columns.tolist(), colors, chart_x, chart_y, chart_width, chart_height, ascending)
-        else:
-            # Fallback to regular column chart
-            self._draw_column_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
-
-    def _draw_stacked_bar_chart_with_data(self, data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw stacked horizontal bar chart with real data"""
-        # Check if data is stacked format (dict with df_pivot) or regular DataFrame
-        if isinstance(data, dict) and data.get('is_stacked'):
-            df_pivot = data.get('df_pivot')
-            if df_pivot is None or df_pivot.empty:
-                return
-            
-            num_bars = len(df_pivot)
-            if num_bars == 0:
-                return
-            
-            bar_height = chart_height / (num_bars + 1)
-            
-            # Get max stacked value for scaling
-            max_val = df_pivot.sum(axis=1).max()
-            if max_val == 0:
-                max_val = 1
-            
-            # Adjust font sizes based on number of bars
-            value_font_size = max(6, 10 - num_bars // 5)
-            category_font_size = max(5, 8 - num_bars // 5)
-            
-            # Calculate label width for offset
-            label_width = 80  # Reserve space for category labels
-            available_width = chart_width - label_width
-            
-            for i, (category, row) in enumerate(df_pivot.iterrows()):
-                bar_y = chart_y + (i + 0.5) * bar_height
-                cumulative_width = 0
-                
-                for j, (series_name, value) in enumerate(row.items()):
-                    if value <= 0:
-                        continue
-                    
-                    segment_width = (value / max_val) * available_width * 0.9
-                    bar_x = chart_x + label_width + cumulative_width
-                    
-                    color = QColor(colors[j % len(colors)])
-                    self.slide_scene.addRect(
-                        bar_x, bar_y,
-                        segment_width, bar_height * 0.7,
-                        color, color
-                    )
-                    
-                    # Value label inside segment if it fits
-                    if segment_width > 30:
-                        val_text = self.slide_scene.addText(str(int(value)), QFont("Calibri", value_font_size))
-                        val_text.setDefaultTextColor(QColor("#FFFFFF"))
-                        val_rect = val_text.boundingRect()
-                        val_text.setPos(
-                            bar_x + segment_width / 2 - val_rect.width() / 2,
-                            bar_y + bar_height * 0.35 - val_rect.height() / 2
-                        )
-                    
-                    cumulative_width += segment_width
-                
-                # Category label on the left
-                category_text = self.slide_scene.addText(str(category)[:12], QFont("Calibri", category_font_size))
-                category_text.setDefaultTextColor(QColor("#374151"))
-                category_rect = category_text.boundingRect()
-                category_text.setPos(chart_x + label_width - category_rect.width() - 5, bar_y + bar_height * 0.35 - category_rect.height() / 2)
-            
-            # Draw legend - position based on sort order
-            ascending = chart_settings.get('ascending', True)
-            self._draw_stacked_legend(df_pivot.columns.tolist(), colors, chart_x, chart_y, chart_width, chart_height, ascending)
-        else:
-            # Fallback to regular bar chart
-            self._draw_bar_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
-
-    def _draw_stacked_legend(self, series_names, colors, chart_x, chart_y, chart_width, chart_height=None, ascending=True):
-        """Draw legend for stacked charts
-        
-        Args:
-            series_names: List of series names
-            colors: List of colors
-            chart_x: Chart X position
-            chart_y: Chart Y position
-            chart_width: Chart width
-            chart_height: Chart height (optional, needed for bottom positioning)
-            ascending: Sort order - if True (ascending) legend at top, if False (descending) legend at bottom
-        """
-        legend_x = chart_x + chart_width - 150
-        
-        # Position legend based on sort order:
-        # - Ascending: legend at top (items go from small to large, largest at bottom)
-        # - Descending: legend at bottom (items go from large to small, largest at top)
-        if ascending:
-            legend_y = chart_y + 10  # Top position
-        else:
-            # Bottom position - calculate based on number of series
-            num_series = min(len(series_names), 6)
-            legend_height = num_series * 18
-            if chart_height:
-                legend_y = chart_y + chart_height - legend_height - 10
-            else:
-                legend_y = chart_y + 10  # Fallback to top if no height provided
-        
-        for i, name in enumerate(series_names[:6]):  # Max 6 series in legend
-            # Legend color box
-            color = QColor(colors[i % len(colors)])
-            self.slide_scene.addRect(
-                legend_x, legend_y + i * 18,
-                12, 12,
-                color, color
-            )
-            
-            # Legend text
-            legend_text = self.slide_scene.addText(str(name)[:15], QFont("Calibri", 8))
-            legend_text.setDefaultTextColor(QColor("#374151"))
-            legend_text.setPos(legend_x + 16, legend_y + i * 18 - 2)
-
-    def _draw_grouped_column_chart_with_data(self, data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw grouped column chart with real data - bars side by side"""
-        # Check if data is grouped format (dict with df_pivot) or regular DataFrame
-        if isinstance(data, dict) and data.get('is_grouped'):
-            df_pivot = data['df_pivot']
-            categories = df_pivot.index.tolist()
-            series_names = df_pivot.columns.tolist()
-            
-            num_categories = len(categories)
-            num_series = len(series_names)
-            
-            if num_categories == 0 or num_series == 0:
-                return
-            
-            # Calculate dimensions
-            group_width = chart_width / (num_categories + 1)
-            bar_width = group_width / (num_series + 1)
-            max_val = df_pivot.values.max()
-            if max_val == 0:
-                max_val = 1
-            
-            # Font sizes based on number of categories
-            category_font_size = max(6, 10 - num_categories // 4)
-            value_font_size = max(5, 8 - num_categories // 5)
-            
-            for i, category in enumerate(categories):
-                group_x = chart_x + (i + 0.5) * group_width
-                
-                # Draw bars side by side within each group
-                for j, series in enumerate(series_names):
-                    value = df_pivot.loc[category, series]
-                    bar_height = (value / max_val) * chart_height * 0.8
-                    
-                    color = QColor(colors[j % len(colors)])
-                    bar_x = group_x + (j - num_series / 2 + 0.5) * bar_width
-                    
-                    self.slide_scene.addRect(
-                        bar_x - bar_width * 0.4, chart_y + chart_height - bar_height,
-                        bar_width * 0.8, bar_height,
-                        color, color
-                    )
-                    
-                    # Value label on top if space allows
-                    if value > 0 and bar_width > 15:
-                        val_text = self.slide_scene.addText(str(int(value)), QFont("Calibri", value_font_size))
-                        val_text.setDefaultTextColor(QColor("#374151"))
-                        val_rect = val_text.boundingRect()
-                        val_text.setPos(
-                            bar_x - val_rect.width() / 2,
-                            chart_y + chart_height - bar_height - val_rect.height() - 2
-                        )
-                
-                # Category label below
-                cat_text = str(category)
-                max_chars = max(4, int(group_width / 7))
-                if len(cat_text) > max_chars:
-                    cat_text = cat_text[:max_chars-1] + ".."
-                category_text = self.slide_scene.addText(cat_text, QFont("Calibri", category_font_size))
-                category_text.setDefaultTextColor(QColor("#374151"))
-                category_rect = category_text.boundingRect()
-                category_text.setPos(group_x - category_rect.width() / 2, chart_y + chart_height + 5)
-            
-            # Draw legend
-            ascending = chart_settings.get('ascending', True)
-            self._draw_stacked_legend(series_names, colors, chart_x, chart_y, chart_width, chart_height, ascending)
-        else:
-            # Fallback to regular column chart
-            self._draw_column_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
-
-    def _draw_grouped_bar_chart_with_data(self, data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
-        """Draw grouped horizontal bar chart with real data - bars side by side"""
-        # Check if data is grouped format (dict with df_pivot) or regular DataFrame
-        if isinstance(data, dict) and data.get('is_grouped'):
-            df_pivot = data['df_pivot']
-            categories = df_pivot.index.tolist()
-            series_names = df_pivot.columns.tolist()
-            
-            num_categories = len(categories)
-            num_series = len(series_names)
-            
-            if num_categories == 0 or num_series == 0:
-                return
-            
-            # Calculate dimensions
-            group_height = chart_height / (num_categories + 1)
-            bar_height = group_height / (num_series + 1)
-            max_val = df_pivot.values.max()
-            if max_val == 0:
-                max_val = 1
-            
-            # Reserve space for category labels on the left
-            label_width = 80
-            available_width = chart_width - label_width
-            
-            # Font sizes based on number of categories
-            category_font_size = max(6, 10 - num_categories // 4)
-            value_font_size = max(5, 8 - num_categories // 5)
-            
-            for i, category in enumerate(categories):
-                group_y = chart_y + (i + 0.5) * group_height
-                
-                # Draw bars side by side within each group
-                for j, series in enumerate(series_names):
-                    value = df_pivot.loc[category, series]
-                    bar_w = (value / max_val) * available_width * 0.9
-                    
-                    color = QColor(colors[j % len(colors)])
-                    bar_y = group_y + (j - num_series / 2 + 0.5) * bar_height
-                    
-                    self.slide_scene.addRect(
-                        chart_x + label_width, bar_y - bar_height * 0.4,
-                        bar_w, bar_height * 0.8,
-                        color, color
-                    )
-                    
-                    # Value label at end if space allows
-                    if value > 0 and bar_height > 10:
-                        val_text = self.slide_scene.addText(str(int(value)), QFont("Calibri", value_font_size))
-                        val_text.setDefaultTextColor(QColor("#374151"))
-                        val_text.setPos(chart_x + label_width + bar_w + 5, bar_y - bar_height * 0.4)
-                
-                # Category label on the left
-                cat_text = str(category)[:12]
-                category_text = self.slide_scene.addText(cat_text, QFont("Calibri", category_font_size))
-                category_text.setDefaultTextColor(QColor("#374151"))
-                category_rect = category_text.boundingRect()
-                category_text.setPos(chart_x + label_width - category_rect.width() - 5, group_y - category_rect.height() / 2)
-            
-            # Draw legend
-            ascending = chart_settings.get('ascending', True)
-            self._draw_stacked_legend(series_names, colors, chart_x, chart_y, chart_width, chart_height, ascending)
-        else:
-            # Fallback to regular bar chart
-            self._draw_bar_chart_with_data(data, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
+    def _draw_stacked_bar_chart_with_data(self, df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings):
+        """Draw stacked bar chart (simplified - uses same as bar for now)"""
+        self._draw_bar_chart_with_data(df, chart_x, chart_y, chart_width, chart_height, colors, chart_settings)
 
     def _draw_placeholder_chart(self, chart_type, chart_x, chart_y, chart_width, chart_height, colors):
         """Draw placeholder chart when no data available"""

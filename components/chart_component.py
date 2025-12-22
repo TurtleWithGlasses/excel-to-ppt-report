@@ -417,12 +417,26 @@ class ChartComponent(BaseComponent):
             self._create_column_chart(ax, df, colors)
             return
 
-        df_pivot = df.pivot_table(
-            values=self.y_column,
-            index=self.x_column,
-            columns=self.series_column,
-            aggfunc='sum'
-        )
+        # Check if y_column exists and is numeric
+        y_is_numeric = False
+        if self.y_column and self.y_column in df.columns:
+            y_is_numeric = pd.api.types.is_numeric_dtype(df[self.y_column])
+
+        if y_is_numeric:
+            df_pivot = df.pivot_table(
+                values=self.y_column,
+                index=self.x_column,
+                columns=self.series_column,
+                aggfunc='sum'
+            ).fillna(0)
+        else:
+            # Use count aggregation for non-numeric y_column
+            df_pivot = df.pivot_table(
+                index=self.x_column,
+                columns=self.series_column,
+                aggfunc='size'
+            ).fillna(0)
+
         df_pivot.plot(kind='bar', stacked=True, ax=ax, color=colors, width=0.7)
 
     def _create_stacked_bar_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
@@ -432,12 +446,26 @@ class ChartComponent(BaseComponent):
             self._create_bar_chart(ax, df, colors)
             return
 
-        df_pivot = df.pivot_table(
-            values=self.y_column,
-            index=self.x_column,
-            columns=self.series_column,
-            aggfunc='sum'
-        )
+        # Check if y_column exists and is numeric
+        y_is_numeric = False
+        if self.y_column and self.y_column in df.columns:
+            y_is_numeric = pd.api.types.is_numeric_dtype(df[self.y_column])
+
+        if y_is_numeric:
+            df_pivot = df.pivot_table(
+                values=self.y_column,
+                index=self.x_column,
+                columns=self.series_column,
+                aggfunc='sum'
+            ).fillna(0)
+        else:
+            # Use count aggregation for non-numeric y_column
+            df_pivot = df.pivot_table(
+                index=self.x_column,
+                columns=self.series_column,
+                aggfunc='size'
+            ).fillna(0)
+
         df_pivot.plot(kind='barh', stacked=True, ax=ax, color=colors, height=0.7)
 
     def _create_grouped_column_chart(self, ax, df: pd.DataFrame, colors: List[str]) -> None:
@@ -447,8 +475,13 @@ class ChartComponent(BaseComponent):
             self._create_column_chart(ax, df, colors)
             return
 
-        # Check if y_column exists and is numeric, otherwise use count
+        # Check if y_column exists and is numeric
+        y_is_numeric = False
         if self.y_column and self.y_column in df.columns:
+            y_is_numeric = pd.api.types.is_numeric_dtype(df[self.y_column])
+
+        if y_is_numeric:
+            # Use sum aggregation for numeric y_column
             df_pivot = df.pivot_table(
                 values=self.y_column,
                 index=self.x_column,
@@ -456,7 +489,7 @@ class ChartComponent(BaseComponent):
                 aggfunc='sum'
             ).fillna(0)
         else:
-            # Use size/count aggregation
+            # Use count aggregation for non-numeric or missing y_column
             df_pivot = df.pivot_table(
                 index=self.x_column,
                 columns=self.series_column,
@@ -475,8 +508,13 @@ class ChartComponent(BaseComponent):
             self._create_bar_chart(ax, df, colors)
             return
 
-        # Check if y_column exists and is numeric, otherwise use count
+        # Check if y_column exists and is numeric
+        y_is_numeric = False
         if self.y_column and self.y_column in df.columns:
+            y_is_numeric = pd.api.types.is_numeric_dtype(df[self.y_column])
+
+        if y_is_numeric:
+            # Use sum aggregation for numeric y_column
             df_pivot = df.pivot_table(
                 values=self.y_column,
                 index=self.x_column,
@@ -484,7 +522,7 @@ class ChartComponent(BaseComponent):
                 aggfunc='sum'
             ).fillna(0)
         else:
-            # Use size/count aggregation
+            # Use count aggregation for non-numeric or missing y_column
             df_pivot = df.pivot_table(
                 index=self.x_column,
                 columns=self.series_column,
