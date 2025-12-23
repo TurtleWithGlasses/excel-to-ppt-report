@@ -909,8 +909,8 @@ class TemplateBuilder(QMainWindow):
             if index >= 0:
                 self.table_sort_column_combo.setCurrentIndex(index)
         
-        # Set sort order
-        self.table_sort_order_combo.setCurrentIndex(0 if existing_sort_order else 1)
+        # Set sort order (index 0 = Descending, index 1 = Ascending)
+        self.table_sort_order_combo.setCurrentIndex(1 if existing_sort_order else 0)
         
         # Set group by
         if existing_group_by:
@@ -1268,8 +1268,8 @@ class TemplateBuilder(QMainWindow):
             if sort_index >= 0:
                 self.chart_sort_column_combo.setCurrentIndex(sort_index)
         
-        # Set sort order
-        self.chart_sort_order_combo.setCurrentIndex(0 if existing_ascending else 1)
+        # Set sort order (index 0 = Descending, index 1 = Ascending)
+        self.chart_sort_order_combo.setCurrentIndex(1 if existing_ascending else 0)
         
         # Set top N
         self.chart_top_n_spin.setValue(existing_top_n)

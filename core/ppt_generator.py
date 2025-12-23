@@ -15,10 +15,13 @@ from pptx import Presentation
 from pptx.util import Inches
 import os
 from datetime import datetime
+import logging
 
 from core.component_factory import ComponentFactory
 from core.data_mapper import DataMapper
 from core.template_manager import TemplateManager
+
+logger = logging.getLogger(__name__)
 
 
 class PPTGenerator:
@@ -246,18 +249,32 @@ class PPTGenerator:
             # Get the full style from slide_settings
             slide_table_style = table_settings.get('style', {})
 
+            # Auto-detect computed columns from requested columns
+            # These are columns that don't exist in raw data but are computed during aggregation
+            computed_column_names = ['Toplam', 'Pozitif', 'Negatif', 'Nötr', 'Kurum',
+                                     'YÜKSEK', 'ORTA', 'DÜŞÜK',
+                                     'Basın', 'Radyo', 'Televizyon', 'İnternet',
+                                     'Ulusal', 'Yerel']
+            requested_columns = table_settings.get('columns', [])
+            computed_columns = table_settings.get('computed_columns', [])
+
+            # Add any computed columns that are in the requested columns but not already in computed_columns
+            for col in requested_columns:
+                if col in computed_column_names and col not in computed_columns:
+                    computed_columns.append(col)
+
             # Add table component with ALL settings from the template builder
             component = {
                 'type': 'table',
                 'position': {'x': 0.5, 'y': 1.0 if title else 0.5},
                 'size': {'width': 9.0, 'height': 5.0 if title else 5.5},
                 'data_source': {
-                    'columns': table_settings.get('columns', []),
+                    'columns': requested_columns,
                     'sort_by': table_settings.get('sort_by'),
                     'ascending': table_settings.get('ascending', False),
                     'group_by': table_settings.get('group_by'),
                     'aggregations': table_settings.get('aggregations', {}),
-                    'computed_columns': table_settings.get('computed_columns', []),
+                    'computed_columns': computed_columns,
                 },
                 'style': slide_table_style.copy() if slide_table_style else {}
             }
@@ -339,13 +356,28 @@ class PPTGenerator:
             series_column = chart_settings.get('series_column')
             actual_y_column = y_column
 
-            # Check if this is a stacked chart and y_column is categorical (not numeric)
-            if chart_type in ('stacked_bar', 'stacked_column'):
-                # For stacked charts, if y_column is a categorical field, use it as series_column
+            # Check if this is a stacked/grouped chart and y_column is categorical (not numeric)
+            if chart_type in ('stacked_bar', 'stacked_column', 'grouped_bar', 'grouped_column'):
+                # For stacked/grouped charts, if y_column is a categorical field, use it as series_column
                 # and use 'Toplam' (count) as the actual y value
-                categorical_columns = ['Medya Tür', 'Mecra Tipi', 'Yayın Tipi', 'Yayın Türü',
-                                       'Duygu', 'Ton', 'Algı', 'Kategori', 'Şehir']
-                if y_column in categorical_columns and not series_column:
+                # Extended list of categorical columns that can be used for grouping/stacking
+                categorical_columns = [
+                    # Media type columns
+                    'Medya Tür', 'Mecra Tipi', 'Yayın Tipi', 'Yayın Türü', 'Mecra',
+                    'Medya Kapsam', 'Medya Peryod', 'Medya İçerik', 'Kupür Tipi',
+                    # Sentiment/perception columns
+                    'Duygu', 'Ton', 'Algı',
+                    # Weight/visibility/size columns
+                    'Bahis Ağırlığı', 'Görünürlük', 'Boyut',
+                    # Location and category columns
+                    'Kategori', 'Şehir', 'Medya Şehir',
+                    # Other categorical columns
+                    'Görsel Malzeme', 'Medya Grup Adı'
+                ]
+                # Check with whitespace tolerance (strip both y_column and categorical names)
+                y_column_stripped = y_column.strip() if y_column else ''
+                categorical_columns_stripped = [c.strip() for c in categorical_columns]
+                if y_column_stripped in categorical_columns_stripped and not series_column:
                     series_column = y_column
                     actual_y_column = 'Toplam'  # Use count
                     if 'Toplam' not in computed_columns:
@@ -441,6 +473,126 @@ class PPTGenerator:
                             'alignment': 'center'
                         }
                     })
+
+        # Handle Blank Slide - can contain chart, table, or both
+        elif slide_type == 'Blank Slide':
+            # Check for chart in slide_settings
+            if 'chart' in slide_settings:
+                chart_settings = slide_settings['chart']
+                title = chart_settings.get('title', '')
+                chart_style = chart_settings.get('style', {})
+
+                if title:
+                    components.append({
+                        'type': 'text',
+                        'content': title,
+                        'position': {'x': 0.5, 'y': 0.3},
+                        'size': {'width': 9.0, 'height': 0.6},
+                        'style': {
+                            'font_name': chart_style.get('font_name', 'Calibri'),
+                            'font_size': 18,
+                            'bold': True,
+                            'alignment': 'left'
+                        }
+                    })
+
+                # Determine y_column handling for categorical columns
+                y_column = chart_settings.get('y_column')
+                computed_column_names = ['Toplam', 'Pozitif', 'Negatif', 'Nötr', 'YÜKSEK', 'ORTA', 'DÜŞÜK',
+                                         'Basın', 'Radyo', 'Televizyon', 'İnternet', 'Ulusal', 'Yerel']
+                computed_columns = []
+                if y_column in computed_column_names:
+                    computed_columns.append(y_column)
+
+                chart_type = chart_settings.get('chart_type', 'column')
+                series_column = chart_settings.get('series_column')
+                actual_y_column = y_column
+
+                # Check if this is a stacked/grouped chart and y_column is categorical
+                if chart_type in ('stacked_bar', 'stacked_column', 'grouped_bar', 'grouped_column'):
+                    categorical_columns = [
+                        'Medya Tür', 'Mecra Tipi', 'Yayın Tipi', 'Yayın Türü', 'Mecra',
+                        'Medya Kapsam', 'Medya Peryod', 'Medya İçerik', 'Kupür Tipi',
+                        'Duygu', 'Ton', 'Algı',
+                        'Bahis Ağırlığı', 'Görünürlük', 'Boyut',
+                        'Kategori', 'Şehir', 'Medya Şehir',
+                        'Görsel Malzeme', 'Medya Grup Adı'
+                    ]
+                    y_column_stripped = y_column.strip() if y_column else ''
+                    categorical_columns_stripped = [c.strip() for c in categorical_columns]
+                    if y_column_stripped in categorical_columns_stripped and not series_column:
+                        series_column = y_column
+                        actual_y_column = 'Toplam'
+                        if 'Toplam' not in computed_columns:
+                            computed_columns.append('Toplam')
+
+                component = {
+                    'type': 'chart',
+                    'position': {'x': 0.5, 'y': 1.0 if title else 0.5},
+                    'size': {'width': 9.0, 'height': 5.0 if title else 5.5},
+                    'data_source': {
+                        'x_column': chart_settings.get('x_column'),
+                        'y_column': actual_y_column,
+                        'series_column': series_column,
+                        'calculation': chart_settings.get('calculation', 'sum'),
+                        'sort_by': chart_settings.get('sort_by'),
+                        'ascending': chart_settings.get('ascending', False),
+                        'top_n': chart_settings.get('top_n'),
+                        'group_by': chart_settings.get('x_column'),
+                        'computed_columns': computed_columns,
+                    },
+                    'chart_type': chart_type,
+                    'style': chart_style.copy() if chart_style else {}
+                }
+                components.append(component)
+
+            # Check for table in slide_settings
+            if 'table' in slide_settings:
+                table_settings = slide_settings['table']
+                title = table_settings.get('title', '')
+                table_style = table_settings.get('style', {})
+
+                # Only add title if no chart title was added
+                if title and 'chart' not in slide_settings:
+                    components.append({
+                        'type': 'text',
+                        'content': title,
+                        'position': {'x': 0.5, 'y': 0.3},
+                        'size': {'width': 9.0, 'height': 0.6},
+                        'style': {
+                            'font_name': table_style.get('font_name', 'Calibri'),
+                            'font_size': 18,
+                            'bold': True,
+                            'alignment': 'left'
+                        }
+                    })
+
+                # Auto-detect computed columns for Blank Slide tables
+                computed_column_names = ['Toplam', 'Pozitif', 'Negatif', 'Nötr', 'Kurum',
+                                         'YÜKSEK', 'ORTA', 'DÜŞÜK',
+                                         'Basın', 'Radyo', 'Televizyon', 'İnternet',
+                                         'Ulusal', 'Yerel']
+                requested_columns = table_settings.get('columns', [])
+                computed_columns = table_settings.get('computed_columns', [])
+                for col in requested_columns:
+                    if col in computed_column_names and col not in computed_columns:
+                        computed_columns.append(col)
+
+                component = {
+                    'type': 'table',
+                    'position': {'x': 0.5, 'y': 1.0 if title else 0.5},
+                    'size': {'width': 9.0, 'height': 5.0 if title else 5.5},
+                    'data_source': {
+                        'columns': requested_columns,
+                        'sort_by': table_settings.get('sort_by'),
+                        'ascending': table_settings.get('ascending', False),
+                        'group_by': table_settings.get('group_by'),
+                        'aggregations': table_settings.get('aggregations', {}),
+                        'computed_columns': computed_columns,
+                    },
+                    'style': table_style.copy() if table_style else {}
+                }
+                components.append(component)
 
         return components
 

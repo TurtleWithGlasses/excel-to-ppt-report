@@ -8,7 +8,7 @@ Supports: Custom styling, zebra striping, headers, sorting, formatting
 from typing import Any, Dict, List, Optional
 from pptx.slide import Slide
 from pptx.enum.text import PP_ALIGN
-from pptx.util import Pt, Inches
+from pptx.util import Pt, Inches as In
 from pptx.dml.color import RGBColor
 from components.base_component import BaseComponent
 import pandas as pd
@@ -77,6 +77,14 @@ class TableComponent(BaseComponent):
             slide: PowerPoint slide object
             data: pandas DataFrame, list of dicts, or dict
         """
+        # Debug: Print style settings being used
+        print("\n[TableComponent] ===== RENDER DEBUG =====")
+        print(f"[TableComponent] Style settings received: {self.style}")
+        print(f"[TableComponent] header_alignment: {self.style.get('header_alignment', 'NOT FOUND')}")
+        print(f"[TableComponent] text_alignment: {self.style.get('text_alignment', 'NOT FOUND')}")
+        print(f"[TableComponent] header_bold: {self.style.get('header_bold', 'NOT FOUND')}")
+        print(f"[TableComponent] text_bold: {self.style.get('text_bold', 'NOT FOUND')}")
+
         # Convert data to DataFrame if needed
         df = self._prepare_data(data)
 
@@ -89,10 +97,50 @@ class TableComponent(BaseComponent):
         rows = len(df) + (1 if self.show_header else 0)
         cols = len(df.columns)
 
+        # Calculate appropriate height based on number of rows
+        # For 16:9 slides (10" x 5.625"), with title at y=0.3" (height 0.6") and table at y=1.0"
+        # Available space: 5.625 - 1.0 = 4.625" (need to leave small margin at bottom)
+        max_height = 4.5  # Conservative to ensure all rows are visible within slide
+
+        # Ideal row heights
+        ideal_header_height = 0.35 if self.show_header else 0
+        ideal_data_row_height = 0.25
+        ideal_total_height = ideal_header_height + (len(df) * ideal_data_row_height)
+
+        # If ideal height exceeds max, scale down the row heights proportionally
+        if ideal_total_height > max_height:
+            scale_factor = max_height / ideal_total_height
+            header_height = ideal_header_height * scale_factor
+            data_row_height = ideal_data_row_height * scale_factor
+            final_height = max_height
+            print(f"[TableComponent] Scaling down row heights by {scale_factor:.3f} to fit within {max_height}\"")
+        else:
+            header_height = ideal_header_height
+            data_row_height = ideal_data_row_height
+            final_height = ideal_total_height
+
+        print(f"[TableComponent] Creating table with {rows} rows (data: {len(df)}, header: {self.show_header}) x {cols} cols")
+        print(f"[TableComponent] Ideal height: {ideal_total_height:.2f}\", final: {final_height:.2f}\"")
+        print(f"[TableComponent] Header height: {header_height:.3f}\", Data row height: {data_row_height:.3f}\"")
+        print(f"[TableComponent] Table position: y={self.y}, total extent: {self.y.inches + final_height:.2f}\"")
+
         table_shape = slide.shapes.add_table(
-            rows, cols, self.x, self.y, self.width, self.height
+            rows, cols, self.x, self.y, self.width, In(final_height)
         )
         table = table_shape.table
+
+        # Explicitly set row heights to ensure all rows are visible
+        print(f"[TableComponent] Setting explicit row heights for {rows} rows")
+        for row_idx in range(rows):
+            if row_idx == 0 and self.show_header:
+                # Header row
+                table.rows[row_idx].height = In(header_height)
+                print(f"[TableComponent] Row {row_idx} (header): height = {header_height:.3f}\"")
+            else:
+                # Data row
+                table.rows[row_idx].height = In(data_row_height)
+                if row_idx < 3:  # Only print first few to avoid spam
+                    print(f"[TableComponent] Row {row_idx} (data): height = {data_row_height:.3f}\"")
 
         # Render header
         if self.show_header:
@@ -103,6 +151,8 @@ class TableComponent(BaseComponent):
 
         # Apply styling
         self._apply_table_styling(table)
+
+        print("[TableComponent] ===== RENDER COMPLETE =====\n")
 
     def _prepare_data(self, data: Any) -> Optional[pd.DataFrame]:
         """
@@ -167,18 +217,37 @@ class TableComponent(BaseComponent):
             table: python-pptx table object
             columns: List of column names
         """
+        print(f"[TableComponent] Rendering header with {len(columns)} columns")
+
         for col_idx, col_name in enumerate(columns):
             cell = table.cell(0, col_idx)
             cell.text = str(col_name)
 
             # Header formatting
             paragraph = cell.text_frame.paragraphs[0]
-            paragraph.alignment = PP_ALIGN.CENTER
+
+            # Apply header alignment from style
+            header_align = self.style.get('header_alignment', 'Center')
+            print(f"[TableComponent] Header col {col_idx}: alignment = {header_align}")
+
+            if header_align.lower() == 'left':
+                paragraph.alignment = PP_ALIGN.LEFT
+            elif header_align.lower() == 'right':
+                paragraph.alignment = PP_ALIGN.RIGHT
+            else:
+                paragraph.alignment = PP_ALIGN.CENTER
 
             font = paragraph.runs[0].font
             font.name = self.get_font_name()
             font.size = self.get_font_size(default=11)
-            font.bold = True
+
+            # Apply header bold/italic from style
+            header_bold = self.style.get('header_bold', True)
+            header_italic = self.style.get('header_italic', False)
+            print(f"[TableComponent] Header col {col_idx}: bold={header_bold}, italic={header_italic}")
+
+            font.bold = header_bold
+            font.italic = header_italic
 
             # Header colors
             r, g, b = self.get_color('header_color', '#2563EB')
@@ -197,6 +266,13 @@ class TableComponent(BaseComponent):
             df: DataFrame with data to render
         """
         row_offset = 1 if self.show_header else 0
+        print(f"[TableComponent] Rendering {len(df)} data rows (row_offset={row_offset})")
+
+        # Get text styling once (same for all cells)
+        text_align = self.style.get('text_alignment', 'Left')
+        text_bold = self.style.get('text_bold', False)
+        text_italic = self.style.get('text_italic', False)
+        print(f"[TableComponent] Text style: alignment={text_align}, bold={text_bold}, italic={text_italic}")
 
         for row_idx, (_, row) in enumerate(df.iterrows()):
             for col_idx, value in enumerate(row):
@@ -205,9 +281,22 @@ class TableComponent(BaseComponent):
 
                 # Cell formatting
                 paragraph = cell.text_frame.paragraphs[0]
+
+                # Apply text alignment from style
+                if text_align.lower() == 'center':
+                    paragraph.alignment = PP_ALIGN.CENTER
+                elif text_align.lower() == 'right':
+                    paragraph.alignment = PP_ALIGN.RIGHT
+                else:
+                    paragraph.alignment = PP_ALIGN.LEFT
+
                 font = paragraph.runs[0].font
                 font.name = self.get_font_name()
                 font.size = self.get_font_size(default=10)
+
+                # Apply text bold/italic from style
+                font.bold = text_bold
+                font.italic = text_italic
 
                 # Text color
                 r, g, b = self.get_color('text_color', '#000000')
@@ -222,6 +311,8 @@ class TableComponent(BaseComponent):
                     r, g, b = self.get_color('row_color_1', '#FFFFFF')
                     cell.fill.solid()
                     cell.fill.fore_color.rgb = RGBColor(r, g, b)
+
+        print(f"[TableComponent] Finished rendering {len(df)} data rows")
 
     def _format_value(self, value: Any) -> str:
         """

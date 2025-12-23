@@ -3,13 +3,22 @@ ReportForge - Main Application Window (Report Generator)
 Simple 4-step workflow: Import Data → Select Template → Prepare Report → Download
 """
 
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QLineEdit, QFileDialog, QComboBox, QProgressBar,
-    QGraphicsView, QGraphicsScene, QMessageBox, QFrame
-)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPainterPath
+try:
+    from PyQt6.QtWidgets import (
+        QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+        QLabel, QLineEdit, QFileDialog, QComboBox, QProgressBar,
+        QGraphicsView, QGraphicsScene, QMessageBox, QFrame
+    )
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal
+    from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPainterPath
+except ImportError:
+    from PySide6.QtWidgets import (
+        QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+        QLabel, QLineEdit, QFileDialog, QComboBox, QProgressBar,
+        QGraphicsView, QGraphicsScene, QMessageBox, QFrame
+    )
+    from PySide6.QtCore import Qt, QThread, Signal as pyqtSignal
+    from PySide6.QtGui import QFont, QColor, QPainter, QPen, QPainterPath
 import os
 import json
 import pandas as pd
@@ -29,12 +38,13 @@ class ReportGeneratorThread(QThread):
     progress = pyqtSignal(int, str)  # (percentage, message)
     finished = pyqtSignal(bool, str, str)  # (success, message, output_path)
 
-    def __init__(self, excel_path, template_path, output_path, variables):
+    def __init__(self, excel_path, template_path, output_path, variables, output_format='pptx'):
         super().__init__()
         self.excel_path = excel_path
         self.template_path = template_path
         self.output_path = output_path
         self.variables = variables
+        self.output_format = output_format  # 'pptx' or 'pdf'
 
     def run(self):
         """Generate report in background"""
@@ -54,10 +64,47 @@ class ReportGeneratorThread(QThread):
                 generator.set_variables(self.variables)
 
                 self.progress.emit(80, "Generating PowerPoint...")
-                output = generator.generate(self.output_path)
+
+                # Always generate PPTX first
+                pptx_output = generator.generate(self.output_path)
+                final_output = pptx_output
+
+                # Convert to PDF if requested
+                print(f"[ReportGenerator] Output format requested: {self.output_format}")
+                if self.output_format == 'pdf':
+                    print("[ReportGenerator] PDF format selected, starting conversion...")
+                    self.progress.emit(90, "Converting to PDF...")
+                    try:
+                        print("[ReportGenerator] Importing PDF converter...")
+                        from utils.pdf_converter import convert_pptx_to_pdf, is_pdf_conversion_available
+
+                        print("[ReportGenerator] Checking if PDF conversion is available...")
+                        if not is_pdf_conversion_available():
+                            raise Exception(
+                                "PDF conversion not available. "
+                                "Requires Windows with Microsoft PowerPoint installed."
+                            )
+
+                        # Convert PPTX to PDF
+                        pdf_output = os.path.splitext(pptx_output)[0] + '.pdf'
+                        print(f"[ReportGenerator] Converting {pptx_output} to {pdf_output}")
+                        final_output = convert_pptx_to_pdf(pptx_output, pdf_output, delete_pptx=False)
+                        print(f"[ReportGenerator] PDF conversion successful: {final_output}")
+
+                    except Exception as pdf_error:
+                        # If PDF conversion fails, still return the PPTX
+                        print(f"[ReportGenerator] PDF conversion error: {str(pdf_error)}")
+                        import traceback
+                        traceback.print_exc()
+                        error_msg = f"PDF conversion failed: {str(pdf_error)}\n\nPowerPoint file saved instead."
+                        self.finished.emit(True, error_msg, pptx_output)
+                        return
+                else:
+                    print(f"[ReportGenerator] PPTX format selected (format={self.output_format}), skipping PDF conversion")
 
                 self.progress.emit(100, "Complete!")
-                self.finished.emit(True, "Report generated successfully!", output)
+                format_name = "PDF" if self.output_format == 'pdf' else "PowerPoint"
+                self.finished.emit(True, f"{format_name} report generated successfully!", final_output)
             else:
                 # Simulation mode
                 for i in range(1, 101, 10):
@@ -305,6 +352,44 @@ class MainWindow(QMainWindow):
         """)
         name_layout.addWidget(self.report_name_input)
 
+        # Add spacing
+        name_layout.addSpacing(20)
+
+        # Format selector
+        format_label = QLabel("Format:")
+        format_label.setFont(QFont("Segoe UI", 11))
+        name_layout.addWidget(format_label)
+
+        self.format_combo = QComboBox()
+        self.format_combo.setFont(QFont("Segoe UI", 11))
+        self.format_combo.addItem("PowerPoint (.pptx)", "pptx")
+        self.format_combo.addItem("PDF (.pdf)", "pdf")
+        self.format_combo.setStyleSheet("""
+            QComboBox {
+                padding: 8px;
+                border: 2px solid #E5E7EB;
+                border-radius: 4px;
+                background-color: white;
+                min-width: 150px;
+            }
+            QComboBox:focus {
+                border: 2px solid #2563EB;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #6B7280;
+            }
+        """)
+        name_layout.addWidget(self.format_combo)
+
+        # Add stretch to push everything to the left
+        name_layout.addStretch()
+
         layout.addLayout(name_layout)
 
     def _create_slide_preview(self, layout):
@@ -534,11 +619,17 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "No Report Name", "Please enter a report name!")
             return
 
+        # Get selected output format
+        output_format = self.format_combo.currentData()  # 'pptx' or 'pdf'
+
+        # Store the selected format for later use in download
+        self.selected_format = output_format
+
         # Create output directory if it doesn't exist
         output_dir = "output"
         os.makedirs(output_dir, exist_ok=True)
 
-        # Generate output path
+        # Generate output path (always use .pptx initially, will be converted if PDF selected)
         output_path = os.path.join(output_dir, f"{report_name}.pptx")
 
         # Prepare variables for text substitution
@@ -560,7 +651,8 @@ class MainWindow(QMainWindow):
             self.excel_path,
             self.template_path,
             output_path,
-            variables
+            variables,
+            output_format
         )
         self.generator_thread.progress.connect(self.update_progress)
         self.generator_thread.finished.connect(self.generation_finished)
@@ -703,7 +795,7 @@ class MainWindow(QMainWindow):
 
     # Step 4: Download Report
     def download_report(self):
-        """Download generated PowerPoint report"""
+        """Download generated report (PowerPoint or PDF)"""
         if not self.generated_slides:
             QMessageBox.warning(
                 self,
@@ -712,23 +804,79 @@ class MainWindow(QMainWindow):
             )
             return
 
+        # Check if we have an output file
+        if not hasattr(self, 'output_path') or not os.path.exists(self.output_path):
+            QMessageBox.warning(
+                self,
+                "File Not Found",
+                "Generated report file not found. Please regenerate the report."
+            )
+            return
+
+        # Use the format that was originally selected, not the file extension
+        # This handles cases where PDF conversion may have failed
+        is_pdf = hasattr(self, 'selected_format') and self.selected_format == 'pdf'
+
+        # Verify the correct file exists
+        if is_pdf:
+            # Check if PDF file exists
+            pdf_path = os.path.splitext(self.output_path)[0] + '.pdf'
+            if os.path.exists(pdf_path):
+                self.output_path = pdf_path  # Update to PDF path
+            else:
+                # PDF conversion may have failed, offer PPTX instead
+                response = QMessageBox.question(
+                    self,
+                    "PDF Not Available",
+                    "PDF file not found. The report is available in PowerPoint format.\n\n"
+                    "Would you like to download the PowerPoint version instead?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if response == QMessageBox.StandardButton.No:
+                    return
+                is_pdf = False
+
         report_name = self.report_name_input.text()
+
+        # Set up file dialog based on format
+        if is_pdf:
+            default_name = f"{report_name}.pdf"
+            file_filter = "PDF Files (*.pdf)"
+            dialog_title = "Save PDF Report"
+        else:
+            default_name = f"{report_name}.pptx"
+            file_filter = "PowerPoint Files (*.pptx)"
+            dialog_title = "Save PowerPoint Report"
+
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Save PowerPoint Report",
-            f"{report_name}.pptx",
-            "PowerPoint Files (*.pptx)"
+            dialog_title,
+            default_name,
+            file_filter
         )
 
         if file_path:
-            # TODO: Save actual PowerPoint file
-            QMessageBox.information(
-                self,
-                "Download Complete",
-                f"Report saved successfully to:\n{file_path}\n\n"
-                f"Total slides: {len(self.generated_slides)}"
-            )
-            self.step4_btn.mark_completed()
+            try:
+                # Copy the generated file to the selected location
+                import shutil
+                shutil.copy2(self.output_path, file_path)
+
+                format_name = "PDF" if is_pdf else "PowerPoint"
+                QMessageBox.information(
+                    self,
+                    "Download Complete",
+                    f"{format_name} report saved successfully to:\n{file_path}\n\n"
+                    f"Total slides: {len(self.generated_slides)}"
+                )
+                self.step4_btn.mark_completed()
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Save Error",
+                    f"Failed to save file:\n{str(e)}"
+                )
+
 
     # Template Builder Integration
     def open_template_builder(self):
@@ -1053,8 +1201,9 @@ class MainWindow(QMainWindow):
             # Apply sorting if specified
             sort_by = table_settings.get('sort_by')
             if sort_by:
+                # Get ascending flag - default to False (descending) since most reports want highest values first
+                ascending = table_settings.get('ascending', False)
                 if sort_by in df.columns:
-                    ascending = table_settings.get('ascending', True)
                     df = df.sort_values(by=sort_by, ascending=ascending)
                 else:
                     # Sort column not available - try first numeric column
@@ -1064,15 +1213,13 @@ class MainWindow(QMainWindow):
                         if sort_col != sort_by:
                             print(f"Sort column '{sort_by}' not found. Available columns: {df.columns.tolist()}")
                             print(f"Sorting by first numeric column: {sort_col}")
-                        ascending = table_settings.get('ascending', True)
                         df = df.sort_values(by=sort_col, ascending=ascending)
 
-            # Apply top_n if specified
+            # Apply top_n if specified - otherwise show ALL rows (no limit)
             top_n = table_settings.get('top_n')
             if top_n and top_n > 0:
                 df = df.head(top_n)
-            else:
-                df = df.head(10)  # Default to 10 rows
+            # No else - show all rows when top_n is not specified
 
             print(f"Table data extracted: {len(df)} rows (grouped: {group_by is not None})")
             return df

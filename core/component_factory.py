@@ -82,6 +82,12 @@ class ComponentFactory:
             )
 
         try:
+            # Debug logging for table components
+            if component_type == 'table':
+                print(f"\n[ComponentFactory] Creating table component")
+                print(f"[ComponentFactory] Config keys: {list(config.keys())}")
+                print(f"[ComponentFactory] Style in config: {config.get('style', 'NOT FOUND')}")
+
             component = component_class(config, template=template)
             return component
         except Exception as e:

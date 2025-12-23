@@ -5,8 +5,8 @@
     "industry": "Fashion & Retail",
     "author": "ReportForge Template Builder",
     "version": "1.0",
-    "created_date": "2025-12-20",
-    "modified_date": "2025-12-20"
+    "created_date": "2025-12-23",
+    "modified_date": "2025-12-23"
   },
   "settings": {
     "page_size": "16:9",
@@ -42,24 +42,31 @@
     "table_slide": {
       "title": "Örnek",
       "subtitle": "",
-      "columns": [],
-      "sort_by": null,
+      "columns": [
+        "Kurum",
+        "Toplam",
+        "Erişim",
+        "StxCm",
+        "Reklam Eşdeğeri",
+        "Net Etki"
+      ],
+      "sort_by": "Toplam",
       "ascending": false,
-      "group_by": null,
+      "group_by": "Firma",
       "note": "",
       "style": {
         "font_name": "Calibri",
         "font_size": 11,
-        "header_color": "#2563EB",
+        "header_color": "#550000",
         "header_text_color": "#00FF00",
-        "row_color_1": "#FFFFFF",
-        "row_color_2": "#F9FAFB",
+        "row_color_1": "#000000",
+        "row_color_2": "#BABABA",
         "text_color": "#AA0000",
         "background_color": "#0000FF",
         "header_alignment": "Center",
         "text_alignment": "Center",
         "header_bold": true,
-        "header_italic": false,
+        "header_italic": true,
         "text_bold": true,
         "text_italic": true,
         "border_color": "#FFFFFF"
@@ -154,7 +161,7 @@
             "Net Etki"
           ],
           "sort_by": "Toplam",
-          "ascending": true,
+          "ascending": false,
           "group_by": "Firma",
           "note": "",
           "style": {
@@ -169,7 +176,7 @@
             "header_alignment": "Center",
             "text_alignment": "Center",
             "header_bold": true,
-            "header_italic": false,
+            "header_italic": true,
             "text_bold": true,
             "text_italic": true,
             "border_color": "#FFFFFF"

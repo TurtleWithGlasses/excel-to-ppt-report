@@ -245,9 +245,12 @@ class DataMapper:
         # For stacked charts with series_column, aggregate by both group_by and series_column
         if series_column and series_column in df.columns and group_by and group_by in df.columns:
             df = self._aggregate_for_stacked_chart(df, group_by, series_column, data_source)
+            print(f"[DataMapper] After stacked aggregation: {len(df)} rows")
         elif group_by and group_by in df.columns:
             # Build aggregation with computed columns
+            print(f"[DataMapper] Grouping by '{group_by}' - unique values: {df[group_by].nunique()}")
             df = self._aggregate_with_computed_columns(df, group_by, computed_columns, aggregations)
+            print(f"[DataMapper] After computed column aggregation: {len(df)} rows")
 
         # Filter columns AFTER aggregation (with case-insensitive matching)
         columns = data_source.get('columns')
@@ -277,6 +280,7 @@ class DataMapper:
         if top_n and isinstance(top_n, int) and top_n > 0:
             df = df.head(top_n)
 
+        print(f"[DataMapper] _get_tabular_data returning {len(df)} rows (top_n={top_n})")
         return df
 
     def _aggregate_for_stacked_chart(
@@ -389,7 +393,10 @@ class DataMapper:
 
         # Add computed columns
         for col_name in computed_columns:
-            if col_name in computed_mappings:
+            # Special handling for 'Kurum' - it's an alias for the group_by column
+            if col_name == 'Kurum':
+                result_df['Kurum'] = result_df[group_by]
+            elif col_name in computed_mappings:
                 source_col_spec, values = computed_mappings[col_name]
 
                 if source_col_spec == '__count__':
