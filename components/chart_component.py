@@ -525,7 +525,7 @@ class ChartComponent(BaseComponent):
             columns=self.series_column,
             aggfunc='sum'
         ).fillna(0)
-        df_pivot.plot(kind='barh', stacked=False, ax=ax, color=colors, height=0.8)
+        df_pivot.plot(kind='barh', stacked=False, ax=ax, color=colors)
 
     def _get_colors(self, df: pd.DataFrame) -> List[str]:
         """

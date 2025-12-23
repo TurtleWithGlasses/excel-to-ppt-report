@@ -982,76 +982,88 @@ class MainWindow(QMainWindow):
             return None
 
         try:
-            # Get column mapping
-            columns = table_settings.get('columns', [])
-            if not columns:
+            # Get requested columns from template
+            requested_columns = table_settings.get('columns', [])
+            if not requested_columns:
                 # Use all columns if not specified
                 return self.excel_data.head(10)
 
-            # Map columns - only select columns that exist in Excel
-            selected_columns = []
-            for col_config in columns:
-                if isinstance(col_config, dict):
-                    source_col = col_config.get('source_column')
-                    if source_col and source_col in self.excel_data.columns:
-                        selected_columns.append(source_col)
-                elif isinstance(col_config, str) and col_config in self.excel_data.columns:
-                    selected_columns.append(col_config)
+            # Define computed columns and their mappings
+            computed_column_names = ['Toplam', 'Pozitif', 'Negatif', 'Nötr', 'Kurum']
 
-            if not selected_columns:
-                print("No valid columns found in table configuration")
-                return self.excel_data.head(10)
+            # Column name mappings (template name -> Excel name)
+            column_mappings = {
+                'Kurum': 'Firma',  # Kurum is displayed name for Firma
+            }
 
-            # Check if we need to group data (look for "Firma" or similar grouping column)
+            # Check if we need to group data
             group_by = table_settings.get('group_by')
 
-            # If no explicit group_by, but "Firma" is in columns, group by Firma
-            if not group_by and 'Firma' in selected_columns:
-                group_by = 'Firma'
+            # Start with the full Excel data
+            df = self.excel_data.copy()
 
-            # Verify group_by is both in Excel data AND in selected columns
-            if group_by and group_by in self.excel_data.columns and group_by in selected_columns:
-                # Group and aggregate data
-                df = self.excel_data[selected_columns].copy()
-
-                # Identify numeric columns for aggregation
+            # If grouping is specified, do aggregation with computed columns
+            if group_by and group_by in df.columns:
+                # Get numeric columns for aggregation
                 numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-
-                # Remove group_by column from numeric cols if present
                 if group_by in numeric_cols:
                     numeric_cols.remove(group_by)
 
-                # Group by the specified column and sum numeric columns
-                if numeric_cols:
-                    agg_dict = {col: 'sum' for col in numeric_cols}
-                    # Keep non-numeric columns by taking first value
-                    for col in selected_columns:
-                        if col != group_by and col not in numeric_cols:
-                            agg_dict[col] = 'first'
+                # Build aggregation dict
+                agg_dict = {col: 'sum' for col in numeric_cols}
 
-                    df = df.groupby(group_by, as_index=False).agg(agg_dict)
-                else:
-                    # No numeric columns, just get unique groups
-                    df = df.drop_duplicates(subset=[group_by])
+                # Perform groupby
+                grouped = df.groupby(group_by)
+
+                # Create result with group_by column
+                result_df = grouped.agg(agg_dict).reset_index()
+
+                # Add 'Toplam' computed column (count per group)
+                if 'Toplam' in requested_columns:
+                    counts = grouped.size().reset_index(name='Toplam')
+                    result_df = result_df.merge(counts[[group_by, 'Toplam']], on=group_by, how='left')
+
+                # Add 'Kurum' column if requested (rename from group_by column)
+                if 'Kurum' in requested_columns and group_by == 'Firma':
+                    result_df['Kurum'] = result_df['Firma']
+
+                df = result_df
             else:
-                # No grouping, just select the columns
-                df = self.excel_data[selected_columns].copy()
+                # No grouping - check if 'Kurum' should map to 'Firma'
+                if 'Kurum' in requested_columns and 'Firma' in df.columns:
+                    df['Kurum'] = df['Firma']
+
+            # Now filter to only requested columns that exist
+            final_columns = []
+            for col in requested_columns:
+                if isinstance(col, dict):
+                    col_name = col.get('source_column', col.get('name'))
+                else:
+                    col_name = col
+
+                if col_name in df.columns:
+                    final_columns.append(col_name)
+                elif col_name in column_mappings and column_mappings[col_name] in df.columns:
+                    # Use mapped column name
+                    final_columns.append(column_mappings[col_name])
+
+            if final_columns:
+                df = df[final_columns]
 
             # Apply sorting if specified
             sort_by = table_settings.get('sort_by')
             if sort_by:
-                # Check if sort_by column exists, if not try to find a match
                 if sort_by in df.columns:
                     ascending = table_settings.get('ascending', True)
                     df = df.sort_values(by=sort_by, ascending=ascending)
                 else:
-                    # Try common mappings for "Toplam" -> count or first numeric column
-                    print(f"Sort column '{sort_by}' not found. Available columns: {df.columns.tolist()}")
-                    # Try to sort by the first numeric column
+                    # Sort column not available - try first numeric column
                     numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
                     if numeric_cols:
                         sort_col = numeric_cols[0]
-                        print(f"Sorting by first numeric column: {sort_col}")
+                        if sort_col != sort_by:
+                            print(f"Sort column '{sort_by}' not found. Available columns: {df.columns.tolist()}")
+                            print(f"Sorting by first numeric column: {sort_col}")
                         ascending = table_settings.get('ascending', True)
                         df = df.sort_values(by=sort_col, ascending=ascending)
 
